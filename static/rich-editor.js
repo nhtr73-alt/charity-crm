@@ -71,59 +71,56 @@ class RichEmailBuilder {
                             <em>I</em>
                         </button>
                         <button type="button" onclick="richEditor.format('underline')" title="Underline (Ctrl+U)">
-                            <u>U</u>
+                            <span style="text-decoration:underline">U</span>
                         </button>
                         <button type="button" onclick="richEditor.format('strikeThrough')" title="Strikethrough">
-                            <s>S</s>
+                            <span style="text-decoration:line-through">S</span>
                         </button>
                     </div>
                     <div class="toolbar-group">
                         <button type="button" onclick="richEditor.format('justifyLeft')" title="Align Left">
-                            <i class="bi bi-text-left"></i>
+                            &#8676;
                         </button>
                         <button type="button" onclick="richEditor.format('justifyCenter')" title="Align Center">
-                            <i class="bi bi-text-center"></i>
+                            &#8596;
                         </button>
                         <button type="button" onclick="richEditor.format('justifyRight')" title="Align Right">
-                            <i class="bi bi-text-right"></i>
-                        </button>
-                        <button type="button" onclick="richEditor.format('justifyFull')" title="Justify">
-                            <i class="bi bi-justify"></i>
+                            &#8677;
                         </button>
                     </div>
                     <div class="toolbar-group">
                         <button type="button" onclick="richEditor.format('insertUnorderedList')" title="Bullet List">
-                            <i class="bi bi-list-ul"></i>
+                            &#8226;
                         </button>
                         <button type="button" onclick="richEditor.format('insertOrderedList')" title="Numbered List">
-                            <i class="bi bi-list-ol"></i>
+                            1.
                         </button>
                     </div>
                     <div class="toolbar-group">
                         <button type="button" onclick="richEditor.format('indent')" title="Indent">
-                            <i class="bi bi-indent"></i>
+                            &#8594;
                         </button>
                         <button type="button" onclick="richEditor.format('outdent')" title="Outdent">
-                            <i class="bi bi-dedent"></i>
+                            &#8592;
                         </button>
                     </div>
                     <div class="toolbar-group">
                         <button type="button" onclick="richEditor.insertLink()" title="Insert Link">
-                            <i class="bi bi-link-45deg"></i>
+                            &#128279;
                         </button>
                         <button type="button" onclick="richEditor.insertImage()" title="Insert Image">
-                            <i class="bi bi-image"></i>
+                            &#128247;
                         </button>
                         <button type="button" onclick="richEditor.insertDivider()" title="Horizontal Line">
-                            <i class="bi bi-hr"></i>
+                            &#8212;
                         </button>
                     </div>
                     <div class="toolbar-group">
                         <button type="button" onclick="richEditor.undo()" title="Undo">
-                            <i class="bi bi-arrow-counterclockwise"></i>
+                            &#8630;
                         </button>
                         <button type="button" onclick="richEditor.redo()" title="Redo">
-                            <i class="bi bi-arrow-clockwise"></i>
+                            &#8631;
                         </button>
                     </div>
                     <div class="toolbar-group merge-fields">
