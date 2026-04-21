@@ -10,9 +10,6 @@
             <a href="{{ url_for('contact_edit', contact_id=contact.id) }}" class="btn btn-outline-primary">
                 <i class="bi bi-pencil"></i> Edit
             </a>
-            <a href="{{ url_for('contact_documents', contact_id=contact.id) }}" class="btn btn-outline-primary">
-                <i class="bi bi-file-earmark"></i> Documents
-            </a>
             <a href="{{ url_for('send_single_email', contact_id=contact.id) }}" class="btn btn-outline-info">
                 <i class="bi bi-envelope"></i> Send Email
             </a>

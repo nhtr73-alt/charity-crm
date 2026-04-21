@@ -1,9 +1,6 @@
-import os
-from flask import Flask, render_template, request, redirect, url_for, flash, session, make_response
+from flask import Flask, render_template, request, redirect, url_for, flash, session
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
-from werkzeug.utils import secure_filename
-from datetime import datetime
 import csv
 import io
 import smtplib
@@ -11,7 +8,10 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from models import db, Contact, ContactNote, Category
 
-ALLOWED_EXTENSIONS = {'pdf', 'doc', 'docx', 'xls', 'xlsx', 'png', 'jpg', 'jpeg'}
+app = Flask(__name__)
+app.config['SECRET_KEY'] = 'charity-crm-secret-key-2024'
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///charity_crm.db'
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db.init_app(app)
 
@@ -26,88 +26,7 @@ class User(UserMixin, db.Model):
     password_hash = db.Column(db.String(255), nullable=False)
     email = db.Column(db.String(255))
     is_admin = db.Column(db.Boolean, default=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-
-class SMTPSettings(db.Model):
-    __tablename__ = 'smtp_settings'
-    id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), unique=True)
-    smtp_server = db.Column(db.String(255))
-    smtp_port = db.Column(db.Integer, default=587)
-    smtp_username = db.Column(db.String(255))
-    smtp_password = db.Column(db.String(255))
-    smtp_from_email = db.Column(db.String(255))
-    use_tls = db.Column(db.Boolean, default=True)
-    mailgun_api_key = db.Column(db.String(255))
-    mailgun_domain = db.Column(db.String(255))
-    mailgun_enabled = db.Column(db.Boolean, default=False)
-    sendgrid_api_key = db.Column(db.String(255))
-    sendgrid_enabled = db.Column(db.Boolean, default=False)
-
-class Document(db.Model):
-    __tablename__ = 'documents'
-    id = db.Column(db.Integer, primary_key=True)
-    contact_id = db.Column(db.Integer, db.ForeignKey('contacts.id'), nullable=False)
-    original_filename = db.Column(db.String(255), nullable=False)
-    document_type = db.Column(db.String(100))
-    file_data = db.Column(db.LargeBinary)
-    content_type = db.Column(db.String(100))
-    uploaded_at = db.Column(db.DateTime, default=datetime.utcnow)
-    uploaded_by = db.Column(db.Integer, db.ForeignKey('users.id'))
-
-class ActivityLog(db.Model):
-    __tablename__ = 'activity_log'
-    id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id'))
-    contact_id = db.Column(db.Integer, db.ForeignKey('contacts.id'))
-    action = db.Column(db.String(100))
-    details = db.Column(db.Text)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-
-class Tag(db.Model):
-    __tablename__ = 'tags'
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(100), unique=True)
-    color = db.Column(db.String(20), default='primary')
-
-class ContactTag(db.Model):
-    __tablename__ = 'contact_tags'
-    id = db.Column(db.Integer, primary_key=True)
-    contact_id = db.Column(db.Integer, db.ForeignKey('contacts.id'))
-    tag_id = db.Column(db.Integer, db.ForeignKey('tags.id'))
-
-class Task(db.Model):
-    __tablename__ = 'tasks'
-    id = db.Column(db.Integer, primary_key=True)
-    contact_id = db.Column(db.Integer, db.ForeignKey('contacts.id'))
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id'))
-    title = db.Column(db.String(255))
-    due_date = db.Column(db.Date)
-    completed = db.Column(db.Boolean, default=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-
-class EmailTemplate(db.Model):
-    __tablename__ = 'email_templates'
-    id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id'))
-    name = db.Column(db.String(255))
-    subject = db.Column(db.String(255))
-    body = db.Column(db.Text)
-
-class DeletedContact(db.Model):
-    __tablename__ = 'deleted_contacts'
-    id = db.Column(db.Integer, primary_key=True)
-    original_id = db.Column(db.Integer)
-    first_name = db.Column(db.String(100))
-    last_name = db.Column(db.String(100))
-    email = db.Column(db.String(255))
-    phone = db.Column(db.String(50))
-    company = db.Column(db.String(255))
-    category = db.Column(db.String(100))
-    sub_category = db.Column(db.String(100))
-    notes = db.Column(db.Text)
-    deleted_at = db.Column(db.DateTime, default=datetime.utcnow)
-    deleted_by = db.Column(db.Integer, db.ForeignKey('users.id'))
+    created_at = db.Column(db.DateTime, default=db.func.now())
 
 @login_manager.user_loader
 def load_user(user_id):
@@ -242,16 +161,7 @@ def index():
     category_counts = {}
     for cat in DEFAULT_CATEGORIES:
         category_counts[cat] = Contact.query.filter_by(category=cat).count()
-
-    recent_contacts = Contact.query.order_by(Contact.created_at.desc()).limit(5).all()
-    recent_activities = ActivityLog.query.order_by(ActivityLog.created_at.desc()).limit(10).all()
-
-    my_tasks = Task.query.filter_by(user_id=current_user.id, completed=False).order_by(Task.due_date.asc()).limit(5).all()
-    overdue_tasks = Task.query.filter(Task.due_date < datetime.utcnow().date(), Task.completed == False).count()
-
-    return render_template('index.html', total_contacts=total_contacts, category_counts=category_counts,
-                         recent_contacts=recent_contacts, recent_activities=recent_activities,
-                         my_tasks=my_tasks, overdue_tasks=overdue_tasks)
+    return render_template('index.html', total_contacts=total_contacts, category_counts=category_counts)
 
 @app.route('/contacts')
 @login_required
@@ -325,25 +235,7 @@ def contact_add():
         )
         db.session.add(contact)
         db.session.commit()
-
-        files = request.files.getlist('documents')
-        for file in files:
-            if file.filename and allowed_file(file.filename):
-                doc = Document(
-                    contact_id=contact.id,
-                    original_filename=file.filename,
-                    document_type=request.form.get('document_type', 'Other'),
-                    file_data=file.read(),
-                    content_type=file.content_type,
-                    uploaded_by=current_user.id
-                )
-                db.session.add(doc)
-
-        if files and files[0].filename:
-            db.session.commit()
-            flash('Contact added with documents!', 'success')
-        else:
-            flash('Contact added successfully!', 'success')
+        flash('Contact added successfully!', 'success')
         return redirect(url_for('contacts_list'))
 
     return render_template('contact_form.html', categories=DEFAULT_CATEGORIES, sub_categories=sub_categories, contact={})
@@ -381,22 +273,9 @@ def contact_edit(contact_id):
 @login_required
 def contact_delete(contact_id):
     contact = Contact.query.get_or_404(contact_id)
-    deleted = DeletedContact(
-        original_id=contact.id,
-        first_name=contact.first_name,
-        last_name=contact.last_name,
-        email=contact.email,
-        phone=contact.phone,
-        company=contact.company,
-        category=contact.category,
-        sub_category=contact.sub_category,
-        notes=contact.notes,
-        deleted_by=current_user.id
-    )
-    db.session.add(deleted)
     db.session.delete(contact)
     db.session.commit()
-    flash('Contact moved to recycle bin!', 'success')
+    flash('Contact deleted successfully!', 'success')
     return redirect(url_for('contacts_list'))
 
 @app.route('/contact/<int:contact_id>/note/add', methods=['POST'])
@@ -526,8 +405,6 @@ def email_page():
     else:
         all_contacts = Contact.query.all()
 
-    use_smtp = request.form.get('use_smtp') == 'send'
-
     if request.method == 'POST':
         recipient_ids = request.form.getlist('recipients')
         recipients = Contact.query.filter(Contact.id.in_(recipient_ids)).all()
@@ -542,33 +419,11 @@ def email_page():
             flash('Subject and body are required.', 'error')
             return redirect(url_for('email_page'))
 
-        if use_smtp:
-            total = len(recipients)
-            limit_warning = ""
-            if total > 100:
-                limit_warning = f"Warning: ISP limits! {total} > 100. Consider Mailgun/SendGrid. Sending first 100... "
-                recipients = recipients[:100]
-
-            success_count = 0
-            error_count = 0
-            import time
-            for i, recipient in enumerate(recipients):
-                ok, msg = send_smtp_email(recipient.email, subject, body, current_user.id)
-                if ok:
-                    success_count += 1
-                else:
-                    error_count += 1
-                if i < len(recipients) - 1:
-                    time.sleep(1)
-
-            flash(limit_warning + f'Emails sent: {success_count}, Failed: {error_count}', 'success' if not limit_warning else 'warning')
-        else:
-            emails = [r.email for r in recipients]
-            session['bulk_emails'] = emails
-            session['email_subject'] = subject
-            session['email_body'] = body
-            flash(f'{len(emails)} email(s) queued. Use your email client to send.', 'success')
-
+        emails = [r.email for r in recipients]
+        session['bulk_emails'] = emails
+        session['email_subject'] = subject
+        session['email_body'] = body
+        flash(f'{len(emails)} email(s) queued. Use your email client to send.', 'success')
         return redirect(url_for('email_page'))
 
     return render_template('email.html', all_contacts=all_contacts, selected_contacts=selected_contacts, selected_ids=[int(r.id) for r in selected_contacts], category_filter=category_filter)
@@ -581,24 +436,15 @@ def send_single_email(contact_id):
     if request.method == 'POST':
         subject = request.form.get('subject', '').strip()
         body = request.form.get('body', '').strip()
-        use_smtp = request.form.get('use_smtp') == 'send'
 
         if not subject or not body:
             flash('Subject and body are required.', 'error')
             return render_template('email_single.html', contact=contact)
 
-        if use_smtp:
-            ok, msg = send_smtp_email(contact.email, subject, body, current_user.id)
-            if ok:
-                flash(f'Email sent to {contact.email}!', 'success')
-            else:
-                flash(f'Failed to send: {msg}', 'error')
-        else:
-            session['single_email'] = contact.email
-            session['email_subject'] = subject
-            session['email_body'] = body
-            flash(f'Email prepared for {contact.email}. Use mailto: link to send.', 'success')
-
+        session['single_email'] = contact.email
+        session['email_subject'] = subject
+        session['email_body'] = body
+        flash(f'Email prepared for {contact.email}. Use mailto: link to send.', 'success')
         return redirect(url_for('contact_detail', contact_id=contact_id))
 
     return render_template('email_single.html', contact=contact)
@@ -611,470 +457,10 @@ def get_unique_sub_categories():
             sub_categories.add(contact.sub_category)
     return sorted(list(sub_categories))
 
-def log_activity(contact_id, action, details=''):
-    if hasattr(current_user, 'id'):
-        log = ActivityLog(user_id=current_user.id, contact_id=contact_id, action=action, details=details)
-        db.session.add(log)
-        db.session.commit()
-
-@app.route('/activity')
-@login_required
-def activity_log():
-    logs = ActivityLog.query.order_by(ActivityLog.created_at.desc()).limit(100).all()
-    return render_template('activity_log.html', logs=logs)
-
-@app.route('/recycle-bin')
-@login_required
-def recycle_bin():
-    deleted = DeletedContact.query.order_by(DeletedContact.deleted_at.desc()).all()
-    return render_template('recycle_bin.html', deleted=deleted)
-
-@app.route('/recycle-bin/<int:id>/restore', methods=['POST'])
-@login_required
-def restore_contact(id):
-    deleted = DeletedContact.query.get_or_404(id)
-    contact = Contact(
-        first_name=deleted.first_name,
-        last_name=deleted.last_name,
-        email=deleted.email,
-        phone=deleted.phone,
-        company=deleted.company,
-        category=deleted.category,
-        sub_category=deleted.sub_category,
-        notes=deleted.notes
-    )
-    db.session.add(contact)
-    db.session.delete(deleted)
-    db.session.commit()
-    flash('Contact restored!', 'success')
-    return redirect(url_for('contacts_list'))
-
-@app.route('/tags', methods=['GET', 'POST'])
-@login_required
-def manage_tags():
-    if request.method == 'POST':
-        name = request.form.get('name', '').strip()
-        color = request.form.get('color', 'primary')
-        if name:
-            existing = Tag.query.filter_by(name=name).first()
-            if not existing:
-                tag = Tag(name=name, color=color)
-                db.session.add(tag)
-                db.session.commit()
-                flash('Tag created!', 'success')
-            else:
-                flash('Tag already exists.', 'error')
-        return redirect(url_for('manage_tags'))
-
-    tags = Tag.query.all()
-    return render_template('tags.html', tags=tags)
-
-@app.route('/contact/<int:contact_id>/tags', methods=['GET', 'POST'])
-@login_required
-def contact_tags(contact_id):
-    contact = Contact.query.get_or_404(contact_id)
-    all_tags = Tag.query.all()
-
-    if request.method == 'POST':
-        selected_tags = request.form.getlist('tags')
-        ContactTag.query.filter_by(contact_id=contact_id).delete()
-        for tag_id in selected_tags:
-            ct = ContactTag(contact_id=contact_id, tag_id=tag_id)
-            db.session.add(ct)
-        db.session.commit()
-        flash('Tags updated!', 'success')
-        return redirect(url_for('contact_detail', contact_id=contact_id))
-
-    contact_tags = [ct.tag_id for ct in ContactTag.query.filter_by(contact_id=contact_id).all()]
-    return render_template('contact_tags.html', contact=contact, all_tags=all_tags, contact_tags=contact_tags)
-
-@app.route('/contact/<int:contact_id>/tasks', methods=['GET', 'POST'])
-@login_required
-def contact_tasks(contact_id):
-    contact = Contact.query.get_or_404(contact_id)
-
-    if request.method == 'POST':
-        title = request.form.get('title', '').strip()
-        due_date = request.form.get('due_date')
-        if title:
-            task = Task(contact_id=contact_id, user_id=current_user.id, title=title, due_date=datetime.strptime(due_date, '%Y-%m-%d') if due_date else None)
-            db.session.add(task)
-            db.session.commit()
-            flash('Task added!', 'success')
-        return redirect(url_for('contact_tasks', contact_id=contact_id))
-
-    tasks = Task.query.filter_by(contact_id=contact_id).order_by(Task.due_date.asc()).all()
-    return render_template('contact_tasks.html', contact=contact, tasks=tasks)
-
-@app.route('/task/<int:task_id>/toggle', methods=['POST'])
-@login_required
-def toggle_task(task_id):
-    task = Task.query.get_or_404(task_id)
-    task.completed = not task.completed
-    db.session.commit()
-    return redirect(url_for('contact_tasks', contact_id=task.contact_id))
-
-@app.route('/task/<int:task_id>/delete', methods=['POST'])
-@login_required
-def delete_task(task_id):
-    task = Task.query.get_or_404(task_id)
-    contact_id = task.contact_id
-    db.session.delete(task)
-    db.session.commit()
-    flash('Task deleted.', 'success')
-    return redirect(url_for('contact_tasks', contact_id=contact_id))
-
-@app.route('/email-templates', methods=['GET', 'POST'])
-@login_required
-def email_templates():
-    if request.method == 'POST':
-        name = request.form.get('name', '').strip()
-        subject = request.form.get('subject', '').strip()
-        body = request.form.get('body', '').strip()
-        if name:
-            template = EmailTemplate(user_id=current_user.id, name=name, subject=subject, body=body)
-            db.session.add(template)
-            db.session.commit()
-            flash('Template saved!', 'success')
-        return redirect(url_for('email_templates'))
-
-    templates = EmailTemplate.query.filter_by(user_id=current_user.id).all()
-    return render_template('email_templates.html', templates=templates)
-
-@app.route('/email-templates/<int:id>/use')
-@login_required
-def use_template(id):
-    template = EmailTemplate.query.get_or_404(id)
-    session['email_subject'] = template.subject
-    session['email_body'] = template.body
-    flash(f'Template "{template.name}" loaded. Go to Email to select recipients.', 'success')
-    return redirect(url_for('email_page'))
-
-@app.route('/email-templates/<int:id>/delete', methods=['POST'])
-@login_required
-def delete_template(id):
-    template = EmailTemplate.query.get_or_404(id)
-    db.session.delete(template)
-    db.session.commit()
-    flash('Template deleted.', 'success')
-    return redirect(url_for('email_templates'))
-
-@app.route('/pipeline')
-@login_required
-def pipeline():
-    contacts = Contact.query.all()
-    stages = {
-        'New': [],
-        'Contacted': [],
-        'In Progress': [],
-        'Completed': [],
-        'Lost': []
-    }
-    for c in contacts:
-        stage = getattr(c, 'pipeline_stage', None) or 'New'
-        if stage in stages:
-            stages[stage].append(c)
-    return render_template('pipeline.html', stages=stages)
-
-@app.route('/contact/<int:contact_id>/set_stage', methods=['POST'])
-@login_required
-def set_pipeline_stage(contact_id):
-    stage = request.form.get('stage')
-    contact = Contact.query.get_or_404(contact_id)
-    contact.pipeline_stage = stage
-    db.session.commit()
-    flash(f'Moved to {stage}', 'success')
-    return redirect(url_for('pipeline'))
-
-@app.route('/quick-add', methods=['POST'])
-@login_required
-def quick_add():
-    first_name = request.form.get('first_name', '').strip()
-    last_name = request.form.get('last_name', '').strip()
-    email = request.form.get('email', '').strip()
-    phone = request.form.get('phone', '').strip()
-    category = request.form.get('category', 'General')
-
-    if not first_name or not last_name or not email:
-        flash('Name and email required.', 'error')
-        return redirect(url_for('index'))
-
-    existing = Contact.query.filter_by(email=email).first()
-    if existing:
-        flash('Contact already exists.', 'error')
-        return redirect(url_for('index'))
-
-    contact = Contact(first_name=first_name, last_name=last_name, email=email, phone=phone, category=category)
-    db.session.add(contact)
-    db.session.commit()
-    log_activity(contact.id, 'Created', f'Quick add by {current_user.username}')
-    flash('Contact added!', 'success')
-    return redirect(url_for('index'))
-
-@app.route('/merge-duplicates')
-@login_required
-def merge_duplicates():
-    emails = db.session.query(Contact.email).filter(Contact.email != '').group_by(Contact.email).having(db.func.count(Contact.id) > 1).all()
-    duplicates = []
-    for (email,) in emails:
-        contacts = Contact.query.filter_by(email=email).all()
-        duplicates.append(contacts)
-    return render_template('merge_duplicates.html', duplicates=duplicates)
-
-@app.route('/contact/<int:id>/merge_into/<int:target_id>', methods=['POST'])
-@login_required
-def merge_contacts(id, target_id):
-    source = Contact.query.get_or_404(id)
-    target = Contact.query.get_or_404(target_id)
-
-    if source.phone and not target.phone:
-        target.phone = source.phone
-    if source.company and not target.company:
-        target.company = source.company
-    if source.notes and not target.notes:
-        target.notes = source.notes
-    elif source.notes and target.notes:
-        target.notes = f"{target.notes}\n\n-- Merged from {source.full_name} --\n{source.notes}"
-
-    docs = Document.query.filter_by(contact_id=id).all()
-    for doc in docs:
-        doc.contact_id = target_id
-
-    notes = ContactNote.query.filter_by(contact_id=id).all()
-    for note in notes:
-        note.contact_id = target_id
-
-    db.session.delete(source)
-    db.session.commit()
-    flash(f'Merged into {target.full_name}', 'success')
-    return redirect(url_for('contacts_list'))
-
-@app.route('/contact/bulk-delete', methods=['POST'])
-@login_required
-def bulk_delete():
-    ids = request.form.getlist('contact_ids')
-    if not ids:
-        flash('No contacts selected.', 'error')
-        return redirect(url_for('contacts_list'))
-
-    for cid in ids:
-        contact = Contact.query.get(int(cid))
-        if contact:
-            deleted = DeletedContact(
-                original_id=contact.id,
-                first_name=contact.first_name,
-                last_name=contact.last_name,
-                email=contact.email,
-                phone=contact.phone,
-                company=contact.company,
-                category=contact.category,
-                sub_category=contact.sub_category,
-                notes=contact.notes,
-                deleted_by=current_user.id
-            )
-            db.session.add(deleted)
-            db.session.delete(contact)
-
-    db.session.commit()
-    flash(f'{len(ids)} contacts moved to recycle bin.', 'success')
-    return redirect(url_for('contacts_list'))
-
-@app.route('/my-tasks')
-@login_required
-def my_tasks():
-    tasks = Task.query.filter_by(user_id=current_user.id, completed=False).order_by(Task.due_date.asc()).all()
-    return render_template('my_tasks.html', tasks=tasks)
-
-def send_smtp_email(recipient_email, subject, body, user_id):
-    settings = SMTPSettings.query.filter_by(user_id=user_id).first()
-    if not settings:
-        return False, "SMTP not configured"
-
-    if settings.sendgrid_enabled and settings.sendgrid_api_key:
-        return send_sendgrid_email(recipient_email, subject, body, settings)
-
-    if settings.mailgun_enabled and settings.mailgun_api_key and settings.mailgun_domain:
-        return send_mailgun_email(recipient_email, subject, body, settings)
-
-    if not settings.smtp_server:
-        return False, "SMTP not configured"
-
-    try:
-        msg = MIMEMultipart()
-        msg['From'] = settings.smtp_from_email or settings.smtp_username
-        msg['To'] = recipient_email
-        msg['Subject'] = subject
-        msg.attach(MIMEText(body, 'plain'))
-
-        server = smtplib.SMTP(settings.smtp_server, settings.smtp_port)
-        if settings.use_tls:
-            server.starttls()
-        server.login(settings.smtp_username, settings.smtp_password)
-        server.sendmail(settings.smtp_from_email or settings.smtp_username, recipient_email, msg.as_string())
-        server.quit()
-        return True, "Sent"
-    except Exception as e:
-        return False, str(e)
-
-def send_mailgun_email(recipient_email, subject, body, settings):
-    import requests
-    try:
-        response = requests.post(
-            f"https://api.mailgun.net/v3/{settings.mailgun_domain}/messages",
-            auth=("api", settings.mailgun_api_key),
-            data={
-                "from": f"{settings.smtp_from_email or 'True Butterflies Foundation'} <noreply@{settings.mailgun_domain}>",
-                "to": recipient_email,
-                "subject": subject,
-                "text": body
-            }
-        )
-        if response.status_code == 200:
-            return True, "Sent via Mailgun"
-        else:
-            return False, f"Mailgun error: {response.text}"
-    except Exception as e:
-        return False, str(e)
-
-def send_sendgrid_email(recipient_email, subject, body, settings):
-    import requests
-    try:
-        response = requests.post(
-            "https://api.sendgrid.com/v3/mail/send",
-            headers={
-                "Authorization": f"Bearer {settings.sendgrid_api_key}",
-                "Content-Type": "application/json"
-            },
-            json={
-                "personalizations": [{"to": [{"email": recipient_email}]}],
-                "from": {"email": settings.smtp_from_email or settings.smtp_username},
-                "subject": subject,
-                "content": [{"type": "text/plain", "value": body}]
-            }
-        )
-        if response.status_code in [200, 202]:
-            return True, "Sent via SendGrid"
-        else:
-            return False, f"SendGrid error: {response.status_code}"
-    except Exception as e:
-        return False, str(e)
-
-def allowed_file(filename):
-    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
-
-@app.route('/contact/<int:contact_id>/documents', methods=['GET', 'POST'])
-@login_required
-def contact_documents(contact_id):
-    contact = Contact.query.get_or_404(contact_id)
-
-    if request.method == 'POST':
-        if 'file' not in request.files:
-            flash('No file selected.', 'error')
-            return redirect(url_for('contact_documents', contact_id=contact_id))
-
-        file = request.files['file']
-        doc_type = request.form.get('document_type', '').strip()
-
-        if file.filename == '':
-            flash('No file selected.', 'error')
-            return redirect(url_for('contact_documents', contact_id=contact_id))
-
-        if file and allowed_file(file.filename):
-            file_data = file.read()
-            doc = Document(
-                contact_id=contact_id,
-                original_filename=file.filename,
-                document_type=doc_type,
-                file_data=file_data,
-                content_type=file.content_type,
-                uploaded_by=current_user.id
-            )
-            db.session.add(doc)
-            db.session.commit()
-            flash('Document uploaded!', 'success')
-        else:
-            flash('Invalid file type. Allowed: PDF, DOC, DOCX, XLS, XLSX, PNG, JPG', 'error')
-
-        return redirect(url_for('contact_documents', contact_id=contact_id))
-
-    documents = Document.query.filter_by(contact_id=contact_id).order_by(Document.uploaded_at.desc()).all()
-    return render_template('contact_documents.html', contact=contact, documents=documents)
-
-@app.route('/contact/<int:contact_id>/document/<int:doc_id>/delete', methods=['POST'])
-@login_required
-def delete_document(contact_id, doc_id):
-    doc = Document.query.get_or_404(doc_id)
-    if doc.contact_id != contact_id:
-        flash('Document not found.', 'error')
-        return redirect(url_for('contacts_list'))
-
-    db.session.delete(doc)
-    db.session.commit()
-    flash('Document deleted.', 'success')
-    return redirect(url_for('contact_documents', contact_id=contact_id))
-
-@app.route('/document/<int:doc_id>/download')
-@login_required
-def download_file(doc_id):
-    doc = Document.query.get_or_404(doc_id)
-    from flask import make_response
-    response = make_response(doc.file_data)
-    response.headers['Content-Type'] = doc.content_type or 'application/octet-stream'
-    response.headers['Content-Disposition'] = f'attachment; filename={doc.original_filename}'
-    return response
-
-@app.route('/settings', methods=['GET', 'POST'])
-@login_required
-def settings():
-    smtp = SMTPSettings.query.filter_by(user_id=current_user.id).first()
-    if not smtp:
-        smtp = SMTPSettings(user_id=current_user.id)
-        db.session.add(smtp)
-        db.session.commit()
-
-    if request.method == 'POST':
-        smtp.smtp_server = request.form.get('smtp_server', '').strip()
-        smtp.smtp_port = request.form.get('smtp_port', '587').strip()
-        smtp.smtp_username = request.form.get('smtp_username', '').strip()
-        smtp.smtp_password = request.form.get('smtp_password', '').strip()
-        smtp.smtp_from_email = request.form.get('smtp_from_email', '').strip()
-        smtp.use_tls = 'use_tls' in request.form
-        db.session.commit()
-        flash('SMTP settings saved!', 'success')
-        return redirect(url_for('settings'))
-
-    return render_template('settings.html', smtp=smtp)
-
-@app.route('/change-password', methods=['GET', 'POST'])
-@login_required
-def change_password():
-    if request.method == 'POST':
-        current_password = request.form.get('current_password', '')
-        new_password = request.form.get('new_password', '')
-        confirm_password = request.form.get('confirm_password', '')
-
-        user = User.query.get(current_user.id)
-
-        if not check_password_hash(user.password_hash, current_password):
-            flash('Current password is incorrect.', 'error')
-        elif new_password != confirm_password:
-            flash('New passwords do not match.', 'error')
-        elif len(new_password) < 4:
-            flash('Password must be at least 4 characters.', 'error')
-        else:
-            user.password_hash = generate_password_hash(new_password)
-            db.session.commit()
-            flash('Password changed successfully!', 'success')
-            return redirect(url_for('index'))
-
-    return render_template('change_password.html')
-
 @app.context_processor
 def inject_categories():
     from flask_login import current_user
     return dict(categories_list=DEFAULT_CATEGORIES, current_user=current_user)
 
 if __name__ == '__main__':
-    if not os.path.exists(UPLOAD_FOLDER):
-        os.makedirs(UPLOAD_FOLDER)
     app.run(debug=True, port=5000)
