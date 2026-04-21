@@ -67,7 +67,7 @@
                                 <td>{{ doc.original_filename }}</td>
                                 <td>{{ doc.uploaded_at.strftime('%Y-%m-%d %H:%M') }}</td>
                                 <td>
-                                    <a href="{{ url_for('download_file', filename=doc.filename) }}" class="btn btn-sm btn-outline-primary" download>
+                                    <a href="{{ url_for('download_file', doc_id=doc.id) }}" class="btn btn-sm btn-outline-primary" download>
                                         <i class="bi bi-download"></i>
                                     </a>
                                     <form method="POST" action="{{ url_for('delete_document', contact_id=contact.id, doc_id=doc.id) }}" style="display:inline;">

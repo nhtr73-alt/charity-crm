@@ -1,5 +1,5 @@
 import os
-from flask import Flask, render_template, request, redirect, url_for, flash, session, send_from_directory
+from flask import Flask, render_template, request, redirect, url_for, flash, session, make_response
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
@@ -11,11 +11,7 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from models import db, Contact, ContactNote, Category
 
-UPLOAD_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'uploads')
 ALLOWED_EXTENSIONS = {'pdf', 'doc', 'docx', 'xls', 'xlsx', 'png', 'jpg', 'jpeg'}
-
-if not os.path.exists(UPLOAD_FOLDER):
-    os.makedirs(UPLOAD_FOLDER)
 
 db.init_app(app)
 
@@ -47,9 +43,10 @@ class Document(db.Model):
     __tablename__ = 'documents'
     id = db.Column(db.Integer, primary_key=True)
     contact_id = db.Column(db.Integer, db.ForeignKey('contacts.id'), nullable=False)
-    filename = db.Column(db.String(255), nullable=False)
     original_filename = db.Column(db.String(255), nullable=False)
     document_type = db.Column(db.String(100))
+    file_data = db.Column(db.LargeBinary)
+    content_type = db.Column(db.String(100))
     uploaded_at = db.Column(db.DateTime, default=datetime.utcnow)
     uploaded_by = db.Column(db.Integer, db.ForeignKey('users.id'))
 
@@ -548,14 +545,13 @@ def contact_documents(contact_id):
             return redirect(url_for('contact_documents', contact_id=contact_id))
 
         if file and allowed_file(file.filename):
-            filename = secure_filename(f"{datetime.utcnow().timestamp()}_{file.filename}")
-            file.save(os.path.join(UPLOAD_FOLDER, filename))
-
+            file_data = file.read()
             doc = Document(
                 contact_id=contact_id,
-                filename=filename,
                 original_filename=file.filename,
                 document_type=doc_type,
+                file_data=file_data,
+                content_type=file.content_type,
                 uploaded_by=current_user.id
             )
             db.session.add(doc)
@@ -577,20 +573,20 @@ def delete_document(contact_id, doc_id):
         flash('Document not found.', 'error')
         return redirect(url_for('contacts_list'))
 
-    try:
-        os.remove(os.path.join(UPLOAD_FOLDER, doc.filename))
-    except:
-        pass
-
     db.session.delete(doc)
     db.session.commit()
     flash('Document deleted.', 'success')
     return redirect(url_for('contact_documents', contact_id=contact_id))
 
-@app.route('/uploads/<filename>')
+@app.route('/document/<int:doc_id>/download')
 @login_required
-def download_file(filename):
-    return send_from_directory(UPLOAD_FOLDER, filename, as_attachment=True)
+def download_file(doc_id):
+    doc = Document.query.get_or_404(doc_id)
+    from flask import make_response
+    response = make_response(doc.file_data)
+    response.headers['Content-Type'] = doc.content_type or 'application/octet-stream'
+    response.headers['Content-Disposition'] = f'attachment; filename={doc.original_filename}'
+    return response
 
 @app.route('/settings', methods=['GET', 'POST'])
 @login_required
