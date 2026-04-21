@@ -17,10 +17,8 @@ ALLOWED_EXTENSIONS = {'pdf', 'doc', 'docx', 'xls', 'xlsx', 'png', 'jpg', 'jpeg'}
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'charity-crm-secret-key-2024')
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:////' + os.path.join(os.path.dirname(os.path.abspath(__file__)), 'charity_crm.db')
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///charity_crm.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['ENV'] = 'production'
-app.config['DEBUG'] = False
 
 db.init_app(app)
 
