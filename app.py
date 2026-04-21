@@ -41,6 +41,8 @@ class SMTPSettings(db.Model):
     mailgun_api_key = db.Column(db.String(255))
     mailgun_domain = db.Column(db.String(255))
     mailgun_enabled = db.Column(db.Boolean, default=False)
+    sendgrid_api_key = db.Column(db.String(255))
+    sendgrid_enabled = db.Column(db.Boolean, default=False)
 
 class Document(db.Model):
     __tablename__ = 'documents'
@@ -888,6 +890,9 @@ def send_smtp_email(recipient_email, subject, body, user_id):
     if not settings:
         return False, "SMTP not configured"
 
+    if settings.sendgrid_enabled and settings.sendgrid_api_key:
+        return send_sendgrid_email(recipient_email, subject, body, settings)
+
     if settings.mailgun_enabled and settings.mailgun_api_key and settings.mailgun_domain:
         return send_mailgun_email(recipient_email, subject, body, settings)
 
@@ -928,6 +933,29 @@ def send_mailgun_email(recipient_email, subject, body, settings):
             return True, "Sent via Mailgun"
         else:
             return False, f"Mailgun error: {response.text}"
+    except Exception as e:
+        return False, str(e)
+
+def send_sendgrid_email(recipient_email, subject, body, settings):
+    import requests
+    try:
+        response = requests.post(
+            "https://api.sendgrid.com/v3/mail/send",
+            headers={
+                "Authorization": f"Bearer {settings.sendgrid_api_key}",
+                "Content-Type": "application/json"
+            },
+            json={
+                "personalizations": [{"to": [{"email": recipient_email}]}],
+                "from": {"email": settings.smtp_from_email or settings.smtp_username},
+                "subject": subject,
+                "content": [{"type": "text/plain", "value": body}]
+            }
+        )
+        if response.status_code in [200, 202]:
+            return True, "Sent via SendGrid"
+        else:
+            return False, f"SendGrid error: {response.status_code}"
     except Exception as e:
         return False, str(e)
 
