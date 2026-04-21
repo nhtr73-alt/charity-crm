@@ -51,15 +51,18 @@ def load_user(user_id):
 with app.app_context():
     db.create_all()
 
-    from sqlalchemy import inspect
-    inspector = inspect(db.engine)
-    smtp_columns = [col['name'] for col in inspector.get_columns('smtp_settings')]
+    try:
+        from sqlalchemy import inspect
+        inspector = inspect(db.engine)
+        smtp_columns = [col['name'] for col in inspector.get_columns('smtp_settings')]
 
-    if 'mailjet_api_key' not in smtp_columns:
-        db.session.execute(db.text('ALTER TABLE smtp_settings ADD COLUMN mailjet_api_key VARCHAR(255)'))
-    if 'mailjet_secret_key' not in smtp_columns:
-        db.session.execute(db.text('ALTER TABLE smtp_settings ADD COLUMN mailjet_secret_key VARCHAR(255)'))
-    db.session.commit()
+        if 'mailjet_api_key' not in smtp_columns:
+            db.session.execute(db.text('ALTER TABLE smtp_settings ADD COLUMN mailjet_api_key VARCHAR(255)'))
+        if 'mailjet_secret_key' not in smtp_columns:
+            db.session.execute(db.text('ALTER TABLE smtp_settings ADD COLUMN mailjet_secret_key VARCHAR(255)'))
+        db.session.commit()
+    except Exception as e:
+        print(f"Migration note: {e}")
 
     default_categories = ['Trader', 'Supplier', 'Ticket Holder', 'Donor', 'Volunteer', 'General']
     for cat_name in default_categories:
