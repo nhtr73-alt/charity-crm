@@ -25,6 +25,7 @@ db.init_app(app)
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login'
+login_manager.login_message = 'Please log in to access this page.'
 
 class User(UserMixin, db.Model):
     __tablename__ = 'users'
@@ -122,21 +123,24 @@ def load_user(user_id):
     return User.query.get(int(user_id))
 
 with app.app_context():
-    db.create_all()
-    default_categories = ['Trader', 'Supplier', 'Ticket Holder', 'Donor', 'Volunteer', 'General']
-    for cat_name in default_categories:
-        existing = Category.query.filter_by(name=cat_name).first()
-        if not existing:
-            cat = Category(name=cat_name, is_default=True)
-            db.session.add(cat)
+    try:
+        db.create_all()
+        default_categories = ['Trader', 'Supplier', 'Ticket Holder', 'Donor', 'Volunteer', 'General']
+        for cat_name in default_categories:
+            existing = Category.query.filter_by(name=cat_name).first()
+            if not existing:
+                cat = Category(name=cat_name, is_default=True)
+                db.session.add(cat)
 
-    if not User.query.first():
-        admin = User(username='admin', password_hash=generate_password_hash('charity2024'), email='admin@charity.org', is_admin=True)
-        db.session.add(admin)
+        if not User.query.first():
+            admin = User(username='admin', password_hash=generate_password_hash('charity2024'), email='admin@charity.org', is_admin=True)
+            db.session.add(admin)
+            db.session.commit()
+            print('Default admin user created: admin / charity2024')
+
         db.session.commit()
-        print('Default admin user created: admin / charity2024')
-
-    db.session.commit()
+    except Exception as e:
+        print(f'DB init error: {e}')
 
 DEFAULT_CATEGORIES = ['Trader', 'Supplier', 'Ticket Holder', 'Donor', 'Volunteer', 'General']
 
