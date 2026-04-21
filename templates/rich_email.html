@@ -100,8 +100,26 @@
                     <input type="file" id="attachmentInput" style="display:none" onchange="uploadAttachment(this)" multiple>
                 </div>
                 <div class="card-body">
-                    <div id="attachmentsList" class="d-grid gap-2" style="max-height: 280px; overflow-y: auto;">
-                        <p class="text-muted small">No attachments</p>
+                    <div id="attachmentsList" class="d-grid gap-2" style="max-height: 150px; overflow-y: auto;">
+                        <p class="text-muted small">No saved attachments</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card mt-2">
+                <div class="card-header">
+                    <h6 class="mb-0">Include in Email</h6>
+                </div>
+                <div class="card-body">
+                    <p class="small text-muted">Select attachments to include:</p>
+                    <div id="selectedAttachments" class="d-grid gap-1" style="max-height: 100px; overflow-y: auto;">
+                        <p class="text-muted small">Upload attachments above, then click to add</p>
+                    </div>
+                    <div class="form-check mt-2">
+                        <input class="form-check-input" type="checkbox" id="includeAttachmentLinks" checked>
+                        <label class="form-check-label small" for="includeAttachmentLinks">
+                            Include download links in email
+                        </label>
                     </div>
                 </div>
             </div>
@@ -293,21 +311,49 @@ function loadAttachments() {
     });
 }
 
+let selectedAttachmentIds = [];
+
 function renderAttachments() {
     const list = document.getElementById('attachmentsList');
+    const selectedList = document.getElementById('selectedAttachments');
+    
     if (attachments.length === 0) {
-        list.innerHTML = '<p class="text-muted small">No attachments</p>';
+        list.innerHTML = '<p class="text-muted small">No saved attachments</p>';
+        selectedList.innerHTML = '<p class="text-muted small">Upload attachments to reuse</p>';
         return;
     }
     
     list.innerHTML = attachments.map(a => `
-        <div class="d-flex justify-content-between align-items-center p-2 border rounded">
-            <span class="small text-truncate" style="max-width: 150px;">${a.filename}</span>
-            <button type="button" class="btn btn-sm btn-outline-danger" onclick="deleteAttachment(${a.id})">
-                <i class="bi bi-trash"></i>
-            </button>
+        <div class="d-flex justify-content-between align-items-center p-1 border rounded mb-1">
+            <span class="small text-truncate" style="max-width: 120px;" title="${a.filename}">${a.filename}</span>
+            <div>
+                <button type="button" class="btn btn-xs ${selectedAttachmentIds.includes(a.id) ? 'btn-success' : 'btn-outline-primary'}" onclick="toggleAttachment(${a.id})" title="Click to include">
+                    <i class="bi bi-${selectedAttachmentIds.includes(a.id) ? 'check' : 'plus'}"></i>
+                </button>
+                <button type="button" class="btn btn-xs btn-outline-danger" onclick="deleteAttachment(${a.id})" title="Delete">
+                    <i class="bi bi-trash"></i>
+                </button>
+            </div>
         </div>
     `).join('');
+    
+    if (selectedAttachmentIds.length === 0) {
+        selectedList.innerHTML = '<p class="text-muted small">Click + to add attachments</p>';
+    } else {
+        selectedList.innerHTML = selectedAttachmentIds.map(id => {
+            const att = attachments.find(a => a.id === id);
+            return att ? `<span class="badge bg-primary me-1">${att.filename}</span>` : '';
+        }).join('');
+    }
+}
+
+function toggleAttachment(id) {
+    if (selectedAttachmentIds.includes(id)) {
+        selectedAttachmentIds = selectedAttachmentIds.filter(a => a !== id);
+    } else {
+        selectedAttachmentIds.push(id);
+    }
+    renderAttachments();
 }
 
 function deleteAttachment(id) {
@@ -341,6 +387,25 @@ function previewWith() {
     win.document.close();
 }
 
+function getAttachmentLinks() {
+    if (selectedAttachmentIds.length === 0) return '';
+    
+    const includeLinks = document.getElementById('includeAttachmentLinks').checked;
+    if (!includeLinks) return '';
+    
+    const selectedAtts = attachments.filter(a => selectedAttachmentIds.includes(a.id));
+    if (selectedAtts.length === 0) return '';
+    
+    let linksHtml = '<hr><p><strong>Attachments:</strong></p><ul>';
+    selectedAtts.forEach(att => {
+        const downloadUrl = '/uploads/attachments/' + att.filename;
+        linksHtml += `<li><a href="${downloadUrl}">${att.filename}</a></li>`;
+    });
+    linksHtml += '</ul>';
+    
+    return linksHtml;
+}
+
 function prepareEmails() {
     const recipientIds = Array.from(document.querySelectorAll('input[name="recipients"]:checked')).map(cb => cb.value);
     if (recipientIds.length === 0) {
@@ -355,6 +420,7 @@ function prepareEmails() {
     }
     
     const selectedContacts = allContacts.filter(c => recipientIds.includes(String(c.id)));
+    const attachmentLinks = getAttachmentLinks();
     
     if (selectedContacts.length === 1) {
         const contact = selectedContacts[0];
@@ -367,9 +433,23 @@ function prepareEmails() {
             .replace(/{{email}}/g, contact.email)
             .replace(/{{company}}/g, contact.company || '');
         
+        if (attachmentLinks) {
+            html += attachmentLinks;
+        }
+        
         window.location.href = `mailto:${contact.email}?subject=${encodeURIComponent(personalizedSubject)}&body=${encodeURIComponent(html)}`;
     } else {
-        let batchHtml = '<h3>Prepared Emails</h3><ul>';
+        let batchHtml = '<h3>Prepared Emails</h3>';
+        
+        if (selectedAttachmentIds.length > 0) {
+            batchHtml += '<p><strong>Attachments to include:</strong> ' + 
+                selectedAttachmentIds.map(id => {
+                    const att = attachments.find(a => a.id === id);
+                    return att ? att.filename : '';
+                }).join(', ') + '</p>';
+        }
+        
+        batchHtml += '<ul>';
         
         selectedContacts.forEach((contact, index) => {
             let personalizedSubject = subject.replace(/{{first_name}}/g, contact.first_name)
@@ -380,6 +460,10 @@ function prepareEmails() {
                 .replace(/{{last_name}}/g, contact.last_name)
                 .replace(/{{email}}/g, contact.email)
                 .replace(/{{company}}/g, contact.company || '');
+            
+            if (attachmentLinks) {
+                html += attachmentLinks;
+            }
             
             batchHtml += `<li><a href="mailto:${contact.email}?subject=${encodeURIComponent(personalizedSubject)}&body=${encodeURIComponent(html)}" target="_blank">${contact.first_name} ${contact.last_name} (${contact.email})</a></li>`;
         });

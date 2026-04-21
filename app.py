@@ -604,6 +604,14 @@ def delete_attachment(attachment_id):
     db.session.commit()
     return {'success': True}
 
+@app.route('/uploads/attachments/<filename>')
+@login_required
+def serve_attachment(filename):
+    from flask import send_from_directory
+    import os
+    upload_folder = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'uploads', 'attachments')
+    return send_from_directory(upload_folder, filename)
+
 def add_email_note(contact_id, subject, body, sent_via='SMTP'):
     from datetime import datetime
     timestamp = datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')
