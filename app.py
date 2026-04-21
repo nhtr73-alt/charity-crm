@@ -4,6 +4,9 @@ from werkzeug.security import generate_password_hash, check_password_hash
 import csv
 import io
 import smtplib
+import json
+import urllib.request
+import urllib.error
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from models import db, Contact, ContactNote, Category
@@ -38,6 +41,8 @@ class SMTPSettings(db.Model):
     smtp_password = db.Column(db.String(255))
     smtp_from_email = db.Column(db.String(255))
     use_tls = db.Column(db.Boolean, default=True)
+    mailjet_api_key = db.Column(db.String(255))
+    mailjet_secret_key = db.Column(db.String(255))
 
 @login_manager.user_loader
 def load_user(user_id):
@@ -45,6 +50,17 @@ def load_user(user_id):
 
 with app.app_context():
     db.create_all()
+
+    from sqlalchemy import inspect
+    inspector = inspect(db.engine)
+    smtp_columns = [col['name'] for col in inspector.get_columns('smtp_settings')]
+
+    if 'mailjet_api_key' not in smtp_columns:
+        db.session.execute(db.text('ALTER TABLE smtp_settings ADD COLUMN mailjet_api_key VARCHAR(255)'))
+    if 'mailjet_secret_key' not in smtp_columns:
+        db.session.execute(db.text('ALTER TABLE smtp_settings ADD COLUMN mailjet_secret_key VARCHAR(255)'))
+    db.session.commit()
+
     default_categories = ['Trader', 'Supplier', 'Ticket Holder', 'Donor', 'Volunteer', 'General']
     for cat_name in default_categories:
         existing = Category.query.filter_by(name=cat_name).first()
@@ -430,14 +446,25 @@ def email_page():
             flash('Subject and body are required.', 'error')
             return redirect(url_for('email_page'))
 
+        for recipient in recipients:
+            add_email_note(recipient.id, subject, body, 'Bulk Email')
+
         emails = [r.email for r in recipients]
         session['bulk_emails'] = emails
         session['email_subject'] = subject
         session['email_body'] = body
-        flash(f'{len(emails)} email(s) queued. Use your email client to send.', 'success')
+        flash(f'{len(emails)} email(s) queued and logged to contact notes. Use your email client to send.', 'success')
         return redirect(url_for('email_page'))
 
     return render_template('email.html', all_contacts=all_contacts, selected_contacts=selected_contacts, selected_ids=[int(r.id) for r in selected_contacts], category_filter=category_filter)
+
+def add_email_note(contact_id, subject, body, sent_via='SMTP'):
+    from datetime import datetime
+    timestamp = datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')
+    note_content = f"[{timestamp}] EMAIL SENT ({sent_via})\nSubject: {subject}\n\n{body}"
+    note = ContactNote(contact_id=contact_id, content=note_content)
+    db.session.add(note)
+    db.session.commit()
 
 @app.route('/contact/<int:contact_id>/send_email', methods=['GET', 'POST'])
 @login_required
@@ -451,6 +478,24 @@ def send_single_email(contact_id):
         if not subject or not body:
             flash('Subject and body are required.', 'error')
             return render_template('email_single.html', contact=contact)
+
+        use_smtp = request.form.get('use_smtp') == 'send'
+
+        if use_smtp:
+            ok, msg = send_smtp_email(contact.email, subject, body, current_user.id)
+            if ok:
+                add_email_note(contact_id, subject, body, 'SMTP')
+                flash(f'Email sent to {contact.email}!', 'success')
+            else:
+                flash(f'Send failed: {msg}. Use mailto instead.', 'error')
+        else:
+            add_email_note(contact_id, subject, body, 'Mailto')
+            mailto_url = f"mailto:{contact.email}?subject={subject}&body={body}"
+            flash(f'Email ready. <a href="{mailto_url}" class="btn btn-primary">Open Email App</a>', 'success')
+
+        return redirect(url_for('contact_detail', contact_id=contact_id))
+
+    return render_template('email_single.html', contact=contact)
 
         use_smtp = request.form.get('use_smtp') == 'send'
 
@@ -485,7 +530,13 @@ def send_smtp_email(recipient_email, subject, body, user_id):
         if not settings and admin_user:
             settings = SMTPSettings.query.filter_by(user_id=admin_user.id).first()
 
-        if not settings or not settings.smtp_server:
+        if not settings:
+            return False, "SMTP not configured - go to Settings"
+
+        if settings.mailjet_api_key and settings.mailjet_secret_key:
+            return send_mailjet_email(recipient_email, subject, body, settings)
+
+        if not settings.smtp_server:
             return False, "SMTP not configured - go to Settings"
 
         msg = MIMEMultipart()
@@ -506,6 +557,47 @@ def send_smtp_email(recipient_email, subject, body, user_id):
         import traceback
         return False, f"Error: {str(e)}"
 
+def send_mailjet_email(recipient_email, subject, body, settings):
+    try:
+        api_key = settings.mailjet_api_key
+        secret_key = settings.mailjet_secret_key
+        from_email = settings.smtp_from_email or settings.smtp_username
+
+        import base64
+        auth = base64.b64encode(f"{api_key}:{secret_key}".encode()).decode()
+
+        data = json.dumps({
+            "Messages": [{
+                "From": {"Email": from_email, "Name": "Charity CRM"},
+                "To": [{"Email": recipient_email}],
+                "Subject": subject,
+                "TextPart": body
+            }]
+        }).encode('utf-8')
+
+        req = urllib.request.Request(
+            "https://api.mailjet.com/v3.0/send",
+            data=data,
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": f"Basic {auth}"
+            },
+            method="POST"
+        )
+
+        with urllib.request.urlopen(req, timeout=30) as response:
+            result = json.loads(response.read().decode())
+            if result.get("Messages", [{}])[0].get("Status") == "success":
+                return True, "Sent"
+            else:
+                return False, f"Mailjet error: {result}"
+
+    except urllib.error.HTTPError as e:
+        error_body = e.read().decode()
+        return False, f"Mailjet HTTP {e.code}: {error_body}"
+    except Exception as e:
+        return False, f"Error: {str(e)}"
+
 @app.route('/settings', methods=['GET', 'POST'])
 @login_required
 def settings():
@@ -516,6 +608,8 @@ def settings():
         db.session.commit()
 
     if request.method == 'POST':
+        smtp.mailjet_api_key = request.form.get('mailjet_api_key', '').strip()
+        smtp.mailjet_secret_key = request.form.get('mailjet_secret_key', '').strip()
         smtp.smtp_server = request.form.get('smtp_server', '').strip()
         smtp.smtp_port = request.form.get('smtp_port', '587').strip()
         smtp.smtp_username = request.form.get('smtp_username', '').strip()
@@ -523,7 +617,7 @@ def settings():
         smtp.smtp_from_email = request.form.get('smtp_from_email', '').strip()
         smtp.use_tls = 'use_tls' in request.form
         db.session.commit()
-        flash('SMTP settings saved!', 'success')
+        flash('Settings saved!', 'success')
         return redirect(url_for('settings'))
 
     return render_template('settings.html', smtp=smtp)

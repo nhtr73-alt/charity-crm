@@ -7,22 +7,39 @@
     <h1>Email Settings</h1>
 
     <div class="alert alert-info">
-        <strong>Mailjet:</strong> SMTP: in-v3.mailjet.com | Port: 587 | TLS: enabled
+        <strong>Mailjet:</strong> Use Mailjet API for reliable email delivery. Get your API keys from <a href="https://app.mailjet.com" target="_blank">mailjet.com</a>
     </div>
 
-    <div class="card">
+    <div class="card mb-4">
+        <div class="card-header bg-primary text-white">
+            <h5 class="mb-0">Mailjet Configuration</h5>
+        </div>
         <div class="card-body">
             <form method="POST">
                 <div class="row">
                     <div class="col-md-6">
                         <div class="mb-3">
-                            <label for="smtp_server" class="form-label">SMTP Server</label>
+                            <label for="mailjet_api_key" class="form-label">Mailjet API Key</label>
+                            <input type="text" class="form-control" id="mailjet_api_key" name="mailjet_api_key" value="{{ smtp.mailjet_api_key or '' }}">
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label for="mailjet_secret_key" class="form-label">Mailjet Secret Key</label>
+                            <input type="password" class="form-control" id="mailjet_secret_key" name="mailjet_secret_key" value="{{ smtp.mailjet_secret_key or '' }}">
+                        </div>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label for="smtp_server" class="form-label">SMTP Server (Alternative)</label>
                             <input type="text" class="form-control" id="smtp_server" name="smtp_server" value="{{ smtp.smtp_server or '' }}">
                         </div>
                     </div>
                     <div class="col-md-6">
                         <div class="mb-3">
-                            <label for="smtp_port" class="form-label">Port</label>
+                            <label for="smtp_port" class="form-label">SMTP Port</label>
                             <input type="number" class="form-control" id="smtp_port" name="smtp_port" value="{{ smtp.smtp_port or 587 }}">
                         </div>
                     </div>
@@ -30,13 +47,13 @@
                 <div class="row">
                     <div class="col-md-6">
                         <div class="mb-3">
-                            <label for="smtp_username" class="form-label">Username / Email</label>
+                            <label for="smtp_username" class="form-label">SMTP Username</label>
                             <input type="text" class="form-control" id="smtp_username" name="smtp_username" value="{{ smtp.smtp_username or '' }}">
                         </div>
                     </div>
                     <div class="col-md-6">
                         <div class="mb-3">
-                            <label for="smtp_password" class="form-label">Password</label>
+                            <label for="smtp_password" class="form-label">SMTP Password</label>
                             <input type="password" class="form-control" id="smtp_password" name="smtp_password" value="{{ smtp.smtp_password or '' }}">
                         </div>
                     </div>
@@ -47,9 +64,9 @@
                 </div>
                 <div class="mb-3 form-check">
                     <input type="checkbox" class="form-check-input" id="use_tls" name="use_tls" value="1" {% if smtp.use_tls != False %}checked{% endif %}>
-                    <label class="form-check-label" for="use_tls">Use TLS</label>
+                    <label class="form-check-label" for="use_tls">Use TLS (SMTP only)</label>
                 </div>
-                <button type="submit" class="btn btn-primary">Save Settings</button>
+                <button type="submit" class="btn btn-primary">Save All Settings</button>
             </form>
         </div>
     </div>
