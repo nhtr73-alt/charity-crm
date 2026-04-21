@@ -6,9 +6,10 @@
 <div class="email-page">
     <h1>Email Editor</h1>
     
-    <div class="row mb-3">
+    <div class="row">
+        <!-- Left Sidebar: Templates & Attachments -->
         <div class="col-md-3">
-            <div class="card">
+            <div class="card mb-3">
                 <div class="card-header d-flex justify-content-between align-items-center">
                     <h5 class="mb-0">Templates</h5>
                     <button type="button" class="btn btn-sm btn-success" onclick="showSaveTemplateModal()">
@@ -17,70 +18,131 @@
                 </div>
                 <div class="card-body">
                     <div class="d-grid gap-2">
-                        <button type="button" class="btn btn-outline-primary btn-sm" onclick="richEditor.loadTemplate('welcome')">
-                            <i class="bi bi-envelope"></i> Welcome Email
-                        </button>
-                        <button type="button" class="btn btn-outline-primary btn-sm" onclick="richEditor.loadTemplate('newsletter')">
-                            <i class="bi bi-newspaper"></i> Newsletter
-                        </button>
-                        <button type="button" class="btn btn-outline-primary btn-sm" onclick="richEditor.loadTemplate('event')">
-                            <i class="bi bi-calendar-event"></i> Event Invite
-                        </button>
-                        <button type="button" class="btn btn-outline-primary btn-sm" onclick="richEditor.loadTemplate('thankyou')">
-                            <i class="bi bi-heart"></i> Thank You
-                        </button>
-                        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="richEditor.clear()">
-                            <i class="bi bi-erase"></i> Clear All
-                        </button>
+                        <button type="button" class="btn btn-outline-primary btn-sm" onclick="richEditor.loadTemplate('welcome')">Welcome</button>
+                        <button type="button" class="btn btn-outline-primary btn-sm" onclick="richEditor.loadTemplate('newsletter')">Newsletter</button>
+                        <button type="button" class="btn btn-outline-primary btn-sm" onclick="richEditor.loadTemplate('event')">Event</button>
+                        <button type="button" class="btn btn-outline-primary btn-sm" onclick="richEditor.loadTemplate('thankyou')">Thank You</button>
+                        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="richEditor.clear()">Clear</button>
                     </div>
                     
                     {% if email_templates %}
                     <hr>
-                    <h6>Saved Templates</h6>
-                    <div class="d-grid gap-2" style="max-height: 200px; overflow-y: auto;">
+                    <h6>Saved</h6>
+                    <div class="d-grid gap-1" style="max-height: 150px; overflow-y: auto;">
                         {% for template in email_templates %}
-                        <div class="d-flex justify-content-between align-items-center p-2 border rounded">
-                            <button type="button" class="btn btn-sm btn-link text-start p-0" onclick="loadSavedTemplate({{ template.id }})">
-                                {{ template.name }}
-                            </button>
-                            <button type="button" class="btn btn-sm btn-outline-danger" onclick="deleteTemplate({{ template.id }})">
-                                <i class="bi bi-trash"></i>
-                            </button>
+                        <div class="d-flex justify-content-between align-items-center p-1 border rounded">
+                            <button type="button" class="btn btn-sm btn-link text-start p-0" onclick="loadSavedTemplate({{ template.id }})">{{ template.name }}</button>
+                            <button type="button" class="btn btn-sm btn-outline-danger" onclick="deleteTemplate({{ template.id }})"><i class="bi bi-trash"></i></button>
                         </div>
                         {% endfor %}
                     </div>
                     {% endif %}
                 </div>
             </div>
-        </div>
-        
-        <div class="col-md-3">
-            <div class="card">
-                <div class="card-header d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0">Recipients</h5>
+            
+            <div class="card mb-3">
+                <div class="card-header">
+                    <h6 class="mb-0">Attachments</h6>
                 </div>
                 <div class="card-body">
-                    <form method="GET" class="mb-2">
-                        <select name="category" class="form-select form-select-sm" onchange="this.form.submit()">
+                    <button type="button" class="btn btn-sm btn-primary w-100 mb-2" onclick="document.getElementById('attachmentInput').click()">
+                        <i class="bi bi-upload"></i> Upload File
+                    </button>
+                    <input type="file" id="attachmentInput" style="display:none" onchange="uploadAttachment(this)" multiple>
+                    
+                    <div id="attachmentsList" class="d-grid gap-1" style="max-height: 100px; overflow-y: auto;">
+                        <p class="text-muted small">No saved</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0">Include in Email</h6>
+                </div>
+                <div class="card-body">
+                    <div id="selectedAttachments" class="mb-2">
+                        <p class="text-muted small">Click + on attachments</p>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="includeAttachmentLinks" checked>
+                        <label class="form-check-label small" for="includeAttachmentLinks">Add download links</label>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Main: Editor + Subject + Recipients -->
+        <div class="col-md-9">
+            <!-- Subject -->
+            <div class="card mb-3">
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-8">
+                            <label class="form-label">Subject</label>
+                            <input type="text" class="form-control" id="emailSubject" placeholder="Enter email subject...">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Preview With</label>
+                            <select class="form-select" id="previewContact" onchange="previewWith()">
+                                <option value="">Select contact...</option>
+                                {% for contact in all_contacts %}
+                                <option value="{{ contact.id }}">{{ contact.first_name }} {{ contact.last_name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Editor -->
+            <div class="card mb-3">
+                <div class="card-body p-0">
+                    <div id="rich-editor"></div>
+                </div>
+            </div>
+            
+            <!-- Recipients -->
+            <div class="card mb-3">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Recipients</h5>
+                    <div>
+                        <select name="category" class="form-select form-select-sm d-inline-block w-auto" onchange="filterRecipients(this.value)">
                             <option value="">All Categories</option>
                             {% for cat in categories_list %}
                             <option value="{{ cat }}" {% if category_filter == cat %}selected{% endif %}>{{ cat }}</option>
                             {% endfor %}
                         </select>
-                    </form>
-                    <div class="table-responsive" style="max-height: 280px; overflow-y: auto;">
-                        <table class="table table-sm">
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="row mb-2">
+                        <div class="col-md-6">
+                            <input type="text" class="form-control" id="searchRecipients" placeholder="Search contacts..." oninput="searchRecipients()">
+                        </div>
+                        <div class="col-md-6 text-end">
+                            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="selectAllRecipients()">Select All</button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="deselectAllRecipients()">Deselect All</button>
+                            <span class="badge bg-primary" id="selectedCount">0 selected</span>
+                        </div>
+                    </div>
+                    <div class="table-responsive" style="max-height: 250px; overflow-y: auto;">
+                        <table class="table table-sm" id="recipientsTable">
                             <thead>
                                 <tr>
-                                    <th><input type="checkbox" id="select-all"></th>
+                                    <th><input type="checkbox" id="select-all-recipients"></th>
                                     <th>Name</th>
+                                    <th>Email</th>
+                                    <th>Category</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {% for contact in all_contacts %}
-                                <tr>
-                                    <td><input type="checkbox" name="recipients" value="{{ contact.id }}"></td>
+                                <tr data-category="{{ contact.category }}" data-name="{{ contact.first_name }} {{ contact.last_name }} {{ contact.email }}">
+                                    <td><input type="checkbox" name="recipients" value="{{ contact.id }}" onchange="updateSelectedCount()"></td>
                                     <td>{{ contact.first_name }} {{ contact.last_name }}</td>
+                                    <td>{{ contact.email }}</td>
+                                    <td><span class="badge bg-secondary">{{ contact.category }}</span></td>
                                 </tr>
                                 {% endfor %}
                             </tbody>
@@ -88,80 +150,14 @@
                     </div>
                 </div>
             </div>
-        </div>
-        
-        <div class="col-md-3">
-            <div class="card">
-                <div class="card-header d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0">Attachments</h5>
-                    <button type="button" class="btn btn-sm btn-primary" onclick="document.getElementById('attachmentInput').click()">
-                        <i class="bi bi-upload"></i> Upload
-                    </button>
-                    <input type="file" id="attachmentInput" style="display:none" onchange="uploadAttachment(this)" multiple>
-                </div>
-                <div class="card-body">
-                    <div id="attachmentsList" class="d-grid gap-2" style="max-height: 150px; overflow-y: auto;">
-                        <p class="text-muted small">No saved attachments</p>
-                    </div>
-                </div>
-            </div>
             
-            <div class="card mt-2">
-                <div class="card-header">
-                    <h6 class="mb-0">Include in Email</h6>
-                </div>
-                <div class="card-body">
-                    <p class="small text-muted">Select attachments to include:</p>
-                    <div id="selectedAttachments" class="d-grid gap-1" style="max-height: 100px; overflow-y: auto;">
-                        <p class="text-muted small">Upload attachments above, then click to add</p>
-                    </div>
-                    <div class="form-check mt-2">
-                        <input class="form-check-input" type="checkbox" id="includeAttachmentLinks" checked>
-                        <label class="form-check-label small" for="includeAttachmentLinks">
-                            Include download links in email
-                        </label>
-                    </div>
-                </div>
+            <!-- Send Button -->
+            <div class="d-grid">
+                <button type="button" class="btn btn-primary btn-lg" onclick="prepareAndSendEmails()">
+                    <i class="bi bi-send"></i> Prepare & Send Emails
+                </button>
             </div>
         </div>
-        
-        <div class="col-md-3">
-            <div class="card">
-                <div class="card-header">
-                    <h5 class="mb-0">Subject & Preview</h5>
-                </div>
-                <div class="card-body">
-                    <div class="mb-2">
-                        <label class="form-label">Subject</label>
-                        <input type="text" class="form-control" id="emailSubject" placeholder="Enter subject...">
-                    </div>
-                    <div class="mb-2">
-                        <label class="form-label">Preview With:</label>
-                        <select class="form-select form-select-sm" id="previewContact" onchange="previewWith()">
-                            <option value="">Select contact...</option>
-                            {% for contact in all_contacts %}
-                            <option value="{{ contact.id }}">{{ contact.first_name }} {{ contact.last_name }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    <button type="button" class="btn btn-outline-info btn-sm" onclick="richEditor.preview()">
-                        <i class="bi bi-eye"></i> Preview
-                    </button>
-                </div>
-            </div>
-        </div>
-    </div>
-    
-    <div class="card">
-        <div class="card-body p-0">
-            <div id="rich-editor"></div>
-        </div>
-    </div>
-    
-    <div class="mt-3">
-        <button type="button" class="btn btn-primary btn-lg" onclick="prepareEmails()">
-            <i class="bi bi-send"></i> Prepare & Send Emails
-        </button>
     </div>
 </div>
 
@@ -185,7 +181,7 @@
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-primary" onclick="saveTemplate()">Save Template</button>
+                <button type="button" class="btn btn-primary" onclick="saveTemplate()">Save</button>
             </div>
         </div>
     </div>
@@ -198,6 +194,7 @@ let richEditor;
 let allContacts = {{ all_contacts|tojson }};
 let currentTemplateId = null;
 let attachments = [];
+let selectedAttachmentIds = [];
 
 document.addEventListener('DOMContentLoaded', function() {
     richEditor = new RichEmailBuilder('rich-editor', {
@@ -205,12 +202,51 @@ document.addEventListener('DOMContentLoaded', function() {
         mergeFields: ['first_name', 'last_name', 'email', 'company']
     });
     
-    document.getElementById('select-all').addEventListener('change', function() {
+    document.getElementById('select-all-recipients').addEventListener('change', function() {
         document.querySelectorAll('input[name="recipients"]').forEach(cb => cb.checked = this.checked);
+        updateSelectedCount();
     });
     
     loadAttachments();
 });
+
+function updateSelectedCount() {
+    const count = document.querySelectorAll('input[name="recipients"]:checked').length;
+    document.getElementById('selectedCount').textContent = count + ' selected';
+}
+
+function selectAllRecipients() {
+    document.querySelectorAll('input[name="recipients"]:not(:disabled)').forEach(cb => cb.checked = true);
+    updateSelectedCount();
+}
+
+function deselectAllRecipients() {
+    document.querySelectorAll('input[name="recipients"]').forEach(cb => cb.checked = false);
+    updateSelectedCount();
+}
+
+function filterRecipients(category) {
+    const rows = document.querySelectorAll('#recipientsTable tbody tr');
+    rows.forEach(row => {
+        if (!category || row.dataset.category === category) {
+            row.style.display = '';
+        } else {
+            row.style.display = 'none';
+        }
+    });
+}
+
+function searchRecipients() {
+    const search = document.getElementById('searchRecipients').value.toLowerCase();
+    const rows = document.querySelectorAll('#recipientsTable tbody tr');
+    rows.forEach(row => {
+        if (row.dataset.name.toLowerCase().includes(search)) {
+            row.style.display = '';
+        } else {
+            row.style.display = 'none';
+        }
+    });
+}
 
 function showSaveTemplateModal() {
     currentTemplateId = null;
@@ -225,32 +261,22 @@ function saveTemplate() {
     const subject = document.getElementById('templateSubject').value;
     const content = richEditor.getHtml();
     
-    if (!name) {
-        alert('Please enter a template name');
-        return;
-    }
+    if (!name) { alert('Please enter a template name'); return; }
     
     const formData = new FormData();
     formData.append('name', name);
     formData.append('subject', subject);
     formData.append('content', content);
-    if (currentTemplateId) {
-        formData.append('id', currentTemplateId);
-    }
+    if (currentTemplateId) formData.append('id', currentTemplateId);
     
-    fetch('{{ url_for("save_email_template") }}', {
-        method: 'POST',
-        body: formData
-    })
+    fetch('{{ url_for("save_email_template") }}', { method: 'POST', body: formData })
     .then(r => r.json())
     .then(data => {
         if (data.success) {
             bootstrap.Modal.getInstance(document.getElementById('saveTemplateModal')).hide();
             alert('Template saved!');
             location.reload();
-        } else {
-            alert(data.message);
-        }
+        } else { alert(data.message); }
     });
 }
 
@@ -269,9 +295,7 @@ function loadSavedTemplate(id) {
 
 function deleteTemplate(id) {
     if (confirm('Delete this template?')) {
-        fetch('{{ url_for("delete_email_template", template_id=0) }}'.replace('0', id), {
-            method: 'POST'
-        })
+        fetch('{{ url_for("delete_email_template", template_id=0) }}'.replace('0', id), { method: 'POST' })
         .then(() => location.reload());
     }
 }
@@ -284,21 +308,15 @@ function uploadAttachment(input) {
         const formData = new FormData();
         formData.append('file', file);
         
-        fetch('{{ url_for("upload_attachment") }}', {
-            method: 'POST',
-            body: formData
-        })
+        fetch('{{ url_for("upload_attachment") }}', { method: 'POST', body: formData })
         .then(r => r.json())
         .then(data => {
             if (data.success) {
                 attachments.push({id: data.id, filename: data.filename});
                 renderAttachments();
-            } else {
-                alert(data.message);
-            }
+            } else { alert(data.message); }
         });
     });
-    
     input.value = '';
 }
 
@@ -311,34 +329,25 @@ function loadAttachments() {
     });
 }
 
-let selectedAttachmentIds = [];
-
 function renderAttachments() {
     const list = document.getElementById('attachmentsList');
     const selectedList = document.getElementById('selectedAttachments');
     
     if (attachments.length === 0) {
-        list.innerHTML = '<p class="text-muted small">No saved attachments</p>';
-        selectedList.innerHTML = '<p class="text-muted small">Upload attachments to reuse</p>';
+        list.innerHTML = '<p class="text-muted small">No saved</p>';
+        selectedList.innerHTML = '<p class="text-muted small">Click + to add</p>';
         return;
     }
     
     list.innerHTML = attachments.map(a => `
         <div class="d-flex justify-content-between align-items-center p-1 border rounded mb-1">
-            <span class="small text-truncate" style="max-width: 120px;" title="${a.filename}">${a.filename}</span>
-            <div>
-                <button type="button" class="btn btn-xs ${selectedAttachmentIds.includes(a.id) ? 'btn-success' : 'btn-outline-primary'}" onclick="toggleAttachment(${a.id})" title="Click to include">
-                    <i class="bi bi-${selectedAttachmentIds.includes(a.id) ? 'check' : 'plus'}"></i>
-                </button>
-                <button type="button" class="btn btn-xs btn-outline-danger" onclick="deleteAttachment(${a.id})" title="Delete">
-                    <i class="bi bi-trash"></i>
-                </button>
-            </div>
+            <span class="small text-truncate" style="max-width: 100px;">${a.filename}</span>
+            <button type="button" class="btn btn-xs ${selectedAttachmentIds.includes(a.id) ? 'btn-success' : 'btn-outline-primary'}" onclick="toggleAttachment(${a.id})">+</button>
         </div>
     `).join('');
     
     if (selectedAttachmentIds.length === 0) {
-        selectedList.innerHTML = '<p class="text-muted small">Click + to add attachments</p>';
+        selectedList.innerHTML = '<p class="text-muted small">Click + to add</p>';
     } else {
         selectedList.innerHTML = selectedAttachmentIds.map(id => {
             const att = attachments.find(a => a.id === id);
@@ -356,19 +365,6 @@ function toggleAttachment(id) {
     renderAttachments();
 }
 
-function deleteAttachment(id) {
-    fetch('{{ url_for("delete_attachment", attachment_id=0) }}'.replace('0', id), {
-        method: 'POST'
-    })
-    .then(r => r.json())
-    .then(data => {
-        if (data.success) {
-            attachments = attachments.filter(a => a.id !== id);
-            renderAttachments();
-        }
-    });
-}
-
 function previewWith() {
     const contactId = document.getElementById('previewContact').value;
     if (!contactId) return;
@@ -377,10 +373,10 @@ function previewWith() {
     if (!contact) return;
     
     let html = richEditor.getHtml();
-    html = html.replace(/{{first_name}}/g, contact.first_name);
-    html = html.replace(/{{last_name}}/g, contact.last_name);
-    html = html.replace(/{{email}}/g, contact.email);
-    html = html.replace(/{{company}}/g, contact.company || '');
+    html = html.replace(/{{first_name}}/g, contact.first_name)
+               .replace(/{{last_name}}/g, contact.last_name)
+               .replace(/{{email}}/g, contact.email)
+               .replace(/{{company}}/g, contact.company || '');
     
     const win = window.open('', '_blank');
     win.document.write(richEditor.wrapInEmailTemplate(html));
@@ -389,25 +385,22 @@ function previewWith() {
 
 function getAttachmentLinks() {
     if (selectedAttachmentIds.length === 0) return '';
-    
-    const includeLinks = document.getElementById('includeAttachmentLinks').checked;
-    if (!includeLinks) return '';
+    if (!document.getElementById('includeAttachmentLinks').checked) return '';
     
     const selectedAtts = attachments.filter(a => selectedAttachmentIds.includes(a.id));
     if (selectedAtts.length === 0) return '';
     
     let linksHtml = '<hr><p><strong>Attachments:</strong></p><ul>';
     selectedAtts.forEach(att => {
-        const downloadUrl = '/uploads/attachments/' + att.filename;
-        linksHtml += `<li><a href="${downloadUrl}">${att.filename}</a></li>`;
+        linksHtml += `<li><a href="/uploads/attachments/${att.filename}">${att.filename}</a></li>`;
     });
     linksHtml += '</ul>';
-    
     return linksHtml;
 }
 
-function prepareEmails() {
+function prepareAndSendEmails() {
     const recipientIds = Array.from(document.querySelectorAll('input[name="recipients"]:checked')).map(cb => cb.value);
+    
     if (recipientIds.length === 0) {
         alert('Please select at least one recipient');
         return;
@@ -429,46 +422,39 @@ function prepareEmails() {
         
         let html = richEditor.getHtml();
         html = html.replace(/{{first_name}}/g, contact.first_name)
-            .replace(/{{last_name}}/g, contact.last_name)
-            .replace(/{{email}}/g, contact.email)
-            .replace(/{{company}}/g, contact.company || '');
+                   .replace(/{{last_name}}/g, contact.last_name)
+                   .replace(/{{email}}/g, contact.email)
+                   .replace(/{{company}}/g, contact.company || '');
         
-        if (attachmentLinks) {
-            html += attachmentLinks;
-        }
+        if (attachmentLinks) html += attachmentLinks;
         
         window.location.href = `mailto:${contact.email}?subject=${encodeURIComponent(personalizedSubject)}&body=${encodeURIComponent(html)}`;
     } else {
-        let batchHtml = '<h3>Prepared Emails</h3>';
+        let batchHtml = '<html><body><h3>Prepared Emails</h3>';
         
         if (selectedAttachmentIds.length > 0) {
-            batchHtml += '<p><strong>Attachments to include:</strong> ' + 
-                selectedAttachmentIds.map(id => {
-                    const att = attachments.find(a => a.id === id);
-                    return att ? att.filename : '';
-                }).join(', ') + '</p>';
+            batchHtml += '<p><strong>Attachments:</strong> ' + 
+                selectedAttachmentIds.map(id => attachments.find(a => a.id === id)?.filename || '').join(', ') + '</p>';
         }
         
         batchHtml += '<ul>';
         
-        selectedContacts.forEach((contact, index) => {
+        selectedContacts.forEach(contact => {
             let personalizedSubject = subject.replace(/{{first_name}}/g, contact.first_name)
                 .replace(/{{last_name}}/g, contact.last_name);
             
             let html = richEditor.getHtml();
             html = html.replace(/{{first_name}}/g, contact.first_name)
-                .replace(/{{last_name}}/g, contact.last_name)
-                .replace(/{{email}}/g, contact.email)
-                .replace(/{{company}}/g, contact.company || '');
+                       .replace(/{{last_name}}/g, contact.last_name)
+                       .replace(/{{email}}/g, contact.email)
+                       .replace(/{{company}}/g, contact.company || '');
             
-            if (attachmentLinks) {
-                html += attachmentLinks;
-            }
+            if (attachmentLinks) html += attachmentLinks;
             
             batchHtml += `<li><a href="mailto:${contact.email}?subject=${encodeURIComponent(personalizedSubject)}&body=${encodeURIComponent(html)}" target="_blank">${contact.first_name} ${contact.last_name} (${contact.email})</a></li>`;
         });
         
-        batchHtml += '</ul><p>Click each link to open in your email client.</p>';
+        batchHtml += '</ul></body></html>';
         
         const win = window.open('', '_blank');
         win.document.write(batchHtml);
