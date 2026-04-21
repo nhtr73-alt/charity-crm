@@ -1,23 +1,51 @@
 {% extends "base.html" %}
 
-{% block title %}SMTP Settings - Charity CRM{% endblock %}
+{% block title %}Email Settings - True Butterflies Foundation{% endblock %}
 
 {% block content %}
 <div class="settings-page">
-    <h1>SMTP Email Settings</h1>
+    <h1>Email Settings</h1>
     <p><a href="{{ url_for('change_password') }}" class="btn btn-outline-secondary">Change Password</a></p>
 
     <div class="alert alert-info">
-        <strong>Why SMTP?</strong> Configure your email server to send emails directly from the app.
-        Common SMTP settings:<br>
-        <ul>
-            <li><strong>Gmail:</strong> smtp.gmail.com, port 587, TLS enabled</li>
-            <li><strong>Outlook:</strong> smtp.office365.com, port 587, TLS enabled</li>
-            <li><strong>Yahoo:</strong> smtp.mail.yahoo.com, port 587, TLS enabled</li>
-        </ul>
+        <strong>Recommendation:</strong> Use Mailgun for bulk emails (5,000 free/month). It's more reliable and won't get marked as spam.
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-header bg-primary text-white">
+            <h5>Mailgun (Recommended for Bulk Email)</h5>
+        </div>
+        <div class="card-body">
+            <form method="POST">
+                <div class="mb-3 form-check">
+                    <input type="checkbox" class="form-check-input" id="mailgun_enabled" name="mailgun_enabled" value="1" {% if smtp.mailgun_enabled %}checked{% endif %}>
+                    <label class="form-check-label" for="mailgun_enabled">Enable Mailgun</label>
+                </div>
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label for="mailgun_domain" class="form-label">Mailgun Domain</label>
+                            <input type="text" class="form-control" id="mailgun_domain" name="mailgun_domain" value="{{ smtp.mailgun_domain or '' }}" placeholder="yourdomain.com">
+                            <small class="text-muted">After verifying domain in Mailgun</small>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label for="mailgun_api_key" class="form-label">Mailgun API Key</label>
+                            <input type="password" class="form-control" id="mailgun_api_key" name="mailgun_api_key" value="{{ smtp.mailgun_api_key or '' }}" placeholder="key-xxxxxxxx">
+                            <small class="text-muted">Found in Mailgun Dashboard → API Security</small>
+                        </div>
+                    </div>
+                </div>
+                <button type="submit" class="btn btn-primary">Save Mailgun Settings</button>
+            </form>
+        </div>
     </div>
 
     <div class="card">
+        <div class="card-header">
+            <h5>Regular SMTP (for smaller volumes)</h5>
+        </div>
         <div class="card-body">
             <form method="POST">
                 <div class="row">
@@ -46,14 +74,14 @@
                         <div class="mb-3">
                             <label for="smtp_password" class="form-label">Password / App Password</label>
                             <input type="password" class="form-control" id="smtp_password" name="smtp_password" value="{{ smtp.smtp_password or '' }}">
-                            <small class="text-muted">For Gmail, use an App Password (not your regular password)</small>
+                            <small class="text-muted">For Gmail, use an App Password</small>
                         </div>
                     </div>
                 </div>
 
                 <div class="mb-3">
-                    <label for="smtp_from_email" class="form-label">From Email (optional)</label>
-                    <input type="email" class="form-control" id="smtp_from_email" name="smtp_from_email" value="{{ smtp.smtp_from_email or '' }}" placeholder="your@email.com">
+                    <label for="smtp_from_email" class="form-label">From Email</label>
+                    <input type="email" class="form-control" id="smtp_from_email" name="smtp_from_email" value="{{ smtp.smtp_from_email or '' }}">
                 </div>
 
                 <div class="mb-3 form-check">
@@ -61,9 +89,7 @@
                     <label class="form-check-label" for="use_tls">Use TLS</label>
                 </div>
 
-                <button type="submit" class="btn btn-primary">
-                    <i class="bi bi-save"></i> Save Settings
-                </button>
+                <button type="submit" class="btn btn-primary">Save SMTP Settings</button>
             </form>
         </div>
     </div>

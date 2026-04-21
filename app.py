@@ -38,6 +38,9 @@ class SMTPSettings(db.Model):
     smtp_password = db.Column(db.String(255))
     smtp_from_email = db.Column(db.String(255))
     use_tls = db.Column(db.Boolean, default=True)
+    mailgun_api_key = db.Column(db.String(255))
+    mailgun_domain = db.Column(db.String(255))
+    mailgun_enabled = db.Column(db.Boolean, default=False)
 
 class Document(db.Model):
     __tablename__ = 'documents'
@@ -538,15 +541,25 @@ def email_page():
             return redirect(url_for('email_page'))
 
         if use_smtp:
+            total = len(recipients)
+            limit_warning = ""
+            if total > 100:
+                limit_warning = f"Warning: ISP limits! {total} > 100. Consider Mailgun/SendGrid. Sending first 100... "
+                recipients = recipients[:100]
+
             success_count = 0
             error_count = 0
-            for recipient in recipients:
+            import time
+            for i, recipient in enumerate(recipients):
                 ok, msg = send_smtp_email(recipient.email, subject, body, current_user.id)
                 if ok:
                     success_count += 1
                 else:
                     error_count += 1
-            flash(f'Emails sent: {success_count}, Failed: {error_count}', 'success')
+                if i < len(recipients) - 1:
+                    time.sleep(1)
+
+            flash(limit_warning + f'Emails sent: {success_count}, Failed: {error_count}', 'success' if not limit_warning else 'warning')
         else:
             emails = [r.email for r in recipients]
             session['bulk_emails'] = emails
@@ -872,7 +885,13 @@ def my_tasks():
 
 def send_smtp_email(recipient_email, subject, body, user_id):
     settings = SMTPSettings.query.filter_by(user_id=user_id).first()
-    if not settings or not settings.smtp_server:
+    if not settings:
+        return False, "SMTP not configured"
+
+    if settings.mailgun_enabled and settings.mailgun_api_key and settings.mailgun_domain:
+        return send_mailgun_email(recipient_email, subject, body, settings)
+
+    if not settings.smtp_server:
         return False, "SMTP not configured"
 
     try:
@@ -889,6 +908,26 @@ def send_smtp_email(recipient_email, subject, body, user_id):
         server.sendmail(settings.smtp_from_email or settings.smtp_username, recipient_email, msg.as_string())
         server.quit()
         return True, "Sent"
+    except Exception as e:
+        return False, str(e)
+
+def send_mailgun_email(recipient_email, subject, body, settings):
+    import requests
+    try:
+        response = requests.post(
+            f"https://api.mailgun.net/v3/{settings.mailgun_domain}/messages",
+            auth=("api", settings.mailgun_api_key),
+            data={
+                "from": f"{settings.smtp_from_email or 'True Butterflies Foundation'} <noreply@{settings.mailgun_domain}>",
+                "to": recipient_email,
+                "subject": subject,
+                "text": body
+            }
+        )
+        if response.status_code == 200:
+            return True, "Sent via Mailgun"
+        else:
+            return False, f"Mailgun error: {response.text}"
     except Exception as e:
         return False, str(e)
 
