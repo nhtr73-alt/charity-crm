@@ -89,6 +89,9 @@
 .merge-fields .btn-outline-info {
     font-size: 12px;
     padding: 4px 8px;
+    width: auto;
+    height: auto;
+    min-width: 50px;
 }
 
 .rich-editor-canvas {

@@ -125,9 +125,10 @@ class RichEmailBuilder {
                     </div>
                     <div class="toolbar-group merge-fields">
                         <span class="me-2">Insert:</span>
-                        ${this.options.mergeFields.map(f => `
-                            <button type="button" class="btn btn-sm btn-outline-info" onclick="richEditor.insertMergeField('{{${f}}}')">{{${f}}}</button>
-                        `).join('')}
+                        <button type="button" class="btn btn-sm btn-outline-info" onclick="richEditor.insertMergeField('{{first_name}}')" title="First Name">First</button>
+                        <button type="button" class="btn btn-sm btn-outline-info" onclick="richEditor.insertMergeField('{{last_name}}')" title="Last Name">Last</button>
+                        <button type="button" class="btn btn-sm btn-outline-info" onclick="richEditor.insertMergeField('{{email}}')" title="Email">Email</button>
+                        <button type="button" class="btn btn-sm btn-outline-info" onclick="richEditor.insertMergeField('{{company}}')" title="Company">Company</button>
                     </div>
                 </div>
                 <div class="rich-editor-canvas" id="editor-canvas" contenteditable="true">
