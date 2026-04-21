@@ -372,6 +372,19 @@ def contact_edit(contact_id):
         contact.sub_category = request.form.get('sub_category', '').strip()
         contact.notes = request.form.get('notes', '').strip()
 
+        files = request.files.getlist('documents')
+        for file in files:
+            if file.filename and allowed_file(file.filename):
+                doc = Document(
+                    contact_id=contact.id,
+                    original_filename=file.filename,
+                    document_type=request.form.get('document_type', 'Other'),
+                    file_data=file.read(),
+                    content_type=file.content_type,
+                    uploaded_by=current_user.id
+                )
+                db.session.add(doc)
+
         db.session.commit()
         flash('Contact updated successfully!', 'success')
         return redirect(url_for('contact_detail', contact_id=contact.id))
