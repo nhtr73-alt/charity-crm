@@ -1,0 +1,181 @@
+{% extends "base.html" %}
+
+{% block title %}Compose Email - True Butterflies Foundation{% endblock %}
+
+{% block content %}
+<div class="email-compose">
+    <h1>Compose Email</h1>
+
+    <div class="alert alert-info">
+        <strong>Personalization:</strong> Use tags like <code>{first_name}</code>, <code>{last_name}</code>, <code>{email}</code>, <code>{company}</code> - they'll be replaced with recipient's info.
+    </div>
+
+    <div class="card">
+        <div class="card-body">
+            <form method="POST">
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <label class="form-label">Recipients (hold Ctrl to select multiple)</label>
+                        <select name="recipients" class="form-select" multiple size="6">
+                            {% for contact in contacts %}
+                            <option value="{{ contact.id }}">{{ contact.first_name }} {{ contact.last_name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Filter by Category</label>
+                        <select class="form-select" id="categorySelect" onchange="filterCategory()">
+                            <option value="">All</option>
+                            {% for cat in categories_list %}
+                            <option value="{{ cat }}">{{ cat }}</option>
+                            {% endfor %}
+                        </select>
+                        <hr>
+                        <label class="form-label">Insert Personalization</label>
+                        <div class="d-flex flex-wrap gap-1">
+                            <button type="button" class="btn btn-outline-info btn-sm" onclick="insertTag('{first_name}')">First Name</button>
+                            <button type="button" class="btn btn-outline-info btn-sm" onclick="insertTag('{last_name}')">Last Name</button>
+                            <button type="button" class="btn btn-outline-info btn-sm" onclick="insertTag('{company}')">Company</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Subject</label>
+                    <input type="text" class="form-control" name="subject" placeholder="Email subject..." required>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Load Template</label>
+                    <select class="form-select" id="templateSelect" onchange="loadTemplate()">
+                        <option value="">-- Select --</option>
+                        {% for t in templates %}
+                        <option value="{{ t.id }}">{{ t.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Message</label>
+                    <div class="btn-toolbar mb-2">
+                        <div class="btn-group me-2">
+                            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="formatDoc('bold')" title="Bold"><b>B</b></button>
+                            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="formatDoc('italic')" title="Italic"><i>I</i></button>
+                            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="formatDoc('underline')" title="Underline"><u>U</u></button>
+                        </div>
+                        <div class="btn-group me-2">
+                            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="formatDoc('insertUnorderedList')" title="Bullet List">• List</button>
+                            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="formatDoc('insertOrderedList')" title="Numbered List">1. List</button>
+                        </div>
+                        <div class="btn-group me-2">
+                            <select class="form-select form-select-sm" onchange="changeFont(this.value)" title="Font">
+                                <option value="">Font</option>
+                                <option value="Arial">Arial</option>
+                                <option value="Times New Roman">Times</option>
+                                <option value="Courier New">Courier</option>
+                                <option value="Georgia">Georgia</option>
+                                <option value="Verdana">Verdana</option>
+                            </select>
+                        </div>
+                        <div class="btn-group">
+                            <select class="form-select form-select-sm" onchange="changeSize(this.value)" title="Size">
+                                <option value="">Size</option>
+                                <option value="1">Small</option>
+                                <option value="3">Normal</option>
+                                <option value="5">Large</option>
+                                <option value="7">X-Large</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="bordereditor" id="editor" contenteditable="true" style="min-height: 300px; padding: 10px; background: white; border: 1px solid #ced4da; border-radius: 4px;">
+                        <p>Type your email here...</p>
+                    </div>
+                    <input type="hidden" name="body" id="emailBody">
+                </div>
+
+                <div class="mb-3 form-check">
+                    <input type="checkbox" class="form-check-input" id="use_smtp" name="use_smtp" value="send" checked>
+                    <label class="form-check-label" for="use_smtp">Send via SMTP (Mailjet)</label>
+                </div>
+
+                <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-send"></i> Send
+                </button>
+                <button type="button" class="btn btn-outline-secondary" onclick="previewEmail()">
+                    <i class="bi bi-eye"></i> Preview
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="previewModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Preview</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="previewContent" style="white-space: pre-wrap;"></div>
+        </div>
+    </div>
+</div>
+
+<script>
+var templates = {{ templates_json|tojson }};
+
+function formatDoc(cmd) {
+    document.execCommand(cmd, false, null);
+    document.getElementById('editor').focus();
+}
+
+function changeFont(font) {
+    if (font) {
+        document.execCommand('fontName', false, font);
+    }
+}
+
+function changeSize(size) {
+    if (size) {
+        document.execCommand('fontSize', false, size);
+    }
+}
+
+function insertTag(tag) {
+    var editor = document.getElementById('editor');
+    editor.focus();
+    editor.document.execCommand('insertHTML', false, '<span style="background: #e0e0ff; padding: 2px 4px; border-radius: 3px;">' + tag + '</span>');
+}
+
+function loadTemplate() {
+    var select = document.getElementById('templateSelect');
+    var id = parseInt(select.value);
+    var template = templates.find(t => t.id === id);
+    if (template) {
+        document.getElementById('editor').innerHTML = template.body || '';
+        document.querySelector('input[name="subject"]').value = template.subject || '';
+    }
+}
+
+function filterCategory() {
+    var category = document.getElementById('categorySelect').value;
+    var select = document.getElementsByName('recipients')[0];
+    var opts = select.options;
+    for (var i = 0; i < opts.length; i++) {
+        var opt = opts[i];
+        opt.selected = false;
+    }
+}
+
+function previewEmail() {
+    var subject = document.querySelector('input[name="subject"]').value;
+    var body = document.getElementById('editor').innerText;
+    document.getElementById('previewContent').innerText = 'Subject: ' + subject + '\n\n' + body;
+    new bootstrap.Modal(document.getElementById('previewModal')).show();
+}
+
+document.querySelector('form').onsubmit = function() {
+    document.getElementById('emailBody').value = document.getElementById('editor').innerHTML;
+};
+</script>
+{% endblock %}

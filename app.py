@@ -524,6 +524,61 @@ def categories():
     category_counts = {cat: Contact.query.filter_by(category=cat).count() for cat in DEFAULT_CATEGORIES}
     return render_template('categories.html', categories=DEFAULT_CATEGORIES, sub_categories=sub_categories, category_counts=category_counts)
 
+@app.route('/email-compose', methods=['GET', 'POST'])
+@login_required
+def email_compose():
+    contacts = Contact.query.all()
+    templates = EmailTemplate.query.all()
+    templates_json = [{'id': t.id, 'name': t.name, 'subject': t.subject, 'body': t.body} for t in templates]
+
+    if request.method == 'POST':
+        recipient_ids = request.form.getlist('recipients')
+        recipients = Contact.query.filter(Contact.id.in_(recipient_ids)).all()
+        subject = request.form.get('subject', '').strip()
+        body = request.form.get('body', '').strip()
+        use_smtp = request.form.get('use_smtp') == 'send'
+
+        if not recipients:
+            flash('No recipients selected.', 'error')
+            return render_template('email_compose.html', contacts=contacts, templates=templates, templates_json=templates_json)
+
+        if not subject or not body:
+            flash('Subject and message are required.', 'error')
+            return render_template('email_compose.html', contacts=contacts, templates=templates, templates_json=templates_json)
+
+        if use_smtp:
+            import time
+            success_count = 0
+            error_count = 0
+            for recipient in recipients:
+                personalized_body = body
+                personalized_body = personalized_body.replace('{first_name}', recipient.first_name or '')
+                personalized_body = personalized_body.replace('{last_name}', recipient.last_name or '')
+                personalized_body = personalized_body.replace('{email}', recipient.email or '')
+                personalized_body = personalized_body.replace('{company}', recipient.company or '')
+
+                from html import unescape
+                personalized_body = unescape(personalized_body)
+
+                ok, msg = send_smtp_email(recipient.email, subject, personalized_body, current_user.id)
+                if ok:
+                    success_count += 1
+                else:
+                    error_count += 1
+                time.sleep(1)
+
+            flash(f'Sent: {success_count}, Failed: {error_count}', 'success')
+        else:
+            emails = [r.email for r in recipients]
+            session['bulk_emails'] = emails
+            session['email_subject'] = subject
+            session['email_body'] = body
+            flash(f'{len(emails)} ready in email client.', 'success')
+
+        return redirect(url_for('email_compose'))
+
+    return render_template('email_compose.html', contacts=contacts, templates=templates, templates_json=templates_json)
+
 @app.route('/email', methods=['GET', 'POST'])
 @login_required
 def email_page():
