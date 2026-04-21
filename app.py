@@ -17,7 +17,7 @@ ALLOWED_EXTENSIONS = {'pdf', 'doc', 'docx', 'xls', 'xlsx', 'png', 'jpg', 'jpeg'}
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'charity-crm-secret-key-2024')
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///charity_crm.db'
+app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///charity_crm.db')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db.init_app(app)
@@ -25,7 +25,6 @@ db.init_app(app)
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login'
-login_manager.login_message = 'Please log in to access this page.'
 
 class User(UserMixin, db.Model):
     __tablename__ = 'users'
@@ -123,24 +122,21 @@ def load_user(user_id):
     return User.query.get(int(user_id))
 
 with app.app_context():
-    try:
-        db.create_all()
-        default_categories = ['Trader', 'Supplier', 'Ticket Holder', 'Donor', 'Volunteer', 'General']
-        for cat_name in default_categories:
-            existing = Category.query.filter_by(name=cat_name).first()
-            if not existing:
-                cat = Category(name=cat_name, is_default=True)
-                db.session.add(cat)
+    db.create_all()
+    default_categories = ['Trader', 'Supplier', 'Ticket Holder', 'Donor', 'Volunteer', 'General']
+    for cat_name in default_categories:
+        existing = Category.query.filter_by(name=cat_name).first()
+        if not existing:
+            cat = Category(name=cat_name, is_default=True)
+            db.session.add(cat)
 
-        if not User.query.first():
-            admin = User(username='admin', password_hash=generate_password_hash('charity2024'), email='admin@charity.org', is_admin=True)
-            db.session.add(admin)
-            db.session.commit()
-            print('Default admin user created: admin / charity2024')
-
+    if not User.query.first():
+        admin = User(username='admin', password_hash=generate_password_hash('charity2024'), email='admin@charity.org', is_admin=True)
+        db.session.add(admin)
         db.session.commit()
-    except Exception as e:
-        print(f'DB init error: {e}')
+        print('Default admin user created: admin / charity2024')
+
+    db.session.commit()
 
 DEFAULT_CATEGORIES = ['Trader', 'Supplier', 'Ticket Holder', 'Donor', 'Volunteer', 'General']
 
@@ -250,32 +246,16 @@ def register():
 @app.route('/')
 @login_required
 def index():
-    try:
-        total_contacts = Contact.query.count()
-        category_counts = {}
-        for cat in DEFAULT_CATEGORIES:
-            category_counts[cat] = Contact.query.filter_by(category=cat).count()
+    total_contacts = Contact.query.count()
+    category_counts = {}
+    for cat in DEFAULT_CATEGORIES:
+        category_counts[cat] = Contact.query.filter_by(category=cat).count()
 
-        recent_contacts = Contact.query.order_by(Contact.created_at.desc()).limit(5).all()
-        recent_activities = []
-        my_tasks = []
-        overdue_tasks = 0
+    recent_contacts = Contact.query.order_by(Contact.created_at.desc()).limit(5).all()
+    recent_activities = ActivityLog.query.order_by(ActivityLog.created_at.desc()).limit(10).all()
 
-        try:
-            recent_activities = ActivityLog.query.order_by(ActivityLog.created_at.desc()).limit(10).all()
-            my_tasks = Task.query.filter_by(user_id=current_user.id, completed=False).limit(5).all()
-            today = datetime.utcnow().date() if hasattr(datetime.utcnow(), 'date') else datetime.now().date()
-            overdue_tasks = Task.query.filter(Task.due_date < today, Task.completed == False).count()
-        except:
-            pass
-    except Exception as e:
-        print(f"Index error: {e}")
-        total_contacts = 0
-        category_counts = {}
-        recent_contacts = []
-        recent_activities = []
-        my_tasks = []
-        overdue_tasks = 0
+    my_tasks = Task.query.filter_by(user_id=current_user.id, completed=False).order_by(Task.due_date.asc()).limit(5).all()
+    overdue_tasks = Task.query.filter(Task.due_date < datetime.utcnow().date(), Task.completed == False).count()
 
     return render_template('index.html', total_contacts=total_contacts, category_counts=category_counts,
                          recent_contacts=recent_contacts, recent_activities=recent_activities,
