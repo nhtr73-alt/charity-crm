@@ -17,8 +17,10 @@ ALLOWED_EXTENSIONS = {'pdf', 'doc', 'docx', 'xls', 'xlsx', 'png', 'jpg', 'jpeg'}
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'charity-crm-secret-key-2024')
-app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///charity_crm.db')
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:////' + os.path.join(os.path.dirname(os.path.abspath(__file__)), 'charity_crm.db')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['ENV'] = 'production'
+app.config['DEBUG'] = False
 
 db.init_app(app)
 
@@ -250,16 +252,32 @@ def register():
 @app.route('/')
 @login_required
 def index():
-    total_contacts = Contact.query.count()
-    category_counts = {}
-    for cat in DEFAULT_CATEGORIES:
-        category_counts[cat] = Contact.query.filter_by(category=cat).count()
+    try:
+        total_contacts = Contact.query.count()
+        category_counts = {}
+        for cat in DEFAULT_CATEGORIES:
+            category_counts[cat] = Contact.query.filter_by(category=cat).count()
 
-    recent_contacts = Contact.query.order_by(Contact.created_at.desc()).limit(5).all()
-    recent_activities = ActivityLog.query.order_by(ActivityLog.created_at.desc()).limit(10).all()
+        recent_contacts = Contact.query.order_by(Contact.created_at.desc()).limit(5).all()
+        recent_activities = []
+        my_tasks = []
+        overdue_tasks = 0
 
-    my_tasks = Task.query.filter_by(user_id=current_user.id, completed=False).order_by(Task.due_date.asc()).limit(5).all()
-    overdue_tasks = Task.query.filter(Task.due_date < datetime.utcnow().date(), Task.completed == False).count()
+        try:
+            recent_activities = ActivityLog.query.order_by(ActivityLog.created_at.desc()).limit(10).all()
+            my_tasks = Task.query.filter_by(user_id=current_user.id, completed=False).limit(5).all()
+            today = datetime.utcnow().date() if hasattr(datetime.utcnow(), 'date') else datetime.now().date()
+            overdue_tasks = Task.query.filter(Task.due_date < today, Task.completed == False).count()
+        except:
+            pass
+    except Exception as e:
+        print(f"Index error: {e}")
+        total_contacts = 0
+        category_counts = {}
+        recent_contacts = []
+        recent_activities = []
+        my_tasks = []
+        overdue_tasks = 0
 
     return render_template('index.html', total_contacts=total_contacts, category_counts=category_counts,
                          recent_contacts=recent_contacts, recent_activities=recent_activities,
