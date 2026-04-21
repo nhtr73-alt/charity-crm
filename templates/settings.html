@@ -7,76 +7,70 @@
     <h1>Email Settings</h1>
     <p><a href="{{ url_for('change_password') }}" class="btn btn-outline-secondary">Change Password</a></p>
 
-    <div class="alert alert-info">
-        <strong>Recommended:</strong> Use SendGrid (3,000 free/month) or Mailgun (5,000 free/month) for reliable bulk email delivery.
-    </div>
-
-    <div class="card mb-4">
-        <div class="card-header bg-primary text-white">
-            <h5>SendGrid (3,000 free emails/month)</h5>
-        </div>
-        <div class="card-body">
-            <form method="POST">
-                <div class="mb-3 form-check">
-                    <input type="checkbox" class="form-check-input" id="sendgrid_enabled" name="sendgrid_enabled" value="1" {% if smtp.sendgrid_enabled %}checked{% endif %}>
-                    <label class="form-check-label" for="sendgrid_enabled">Enable SendGrid</label>
-                </div>
-                <div class="row">
-                    <div class="col-md-6">
-                        <div class="mb-3">
-                            <label for="sendgrid_api_key" class="form-label">SendGrid API Key</label>
-                            <input type="password" class="form-control" id="sendgrid_api_key" name="sendgrid_api_key" value="{{ smtp.sendgrid_api_key or '' }}" placeholder="SG.xxxxxx">
-                            <small class="text-muted">Get from Settings → API Keys in SendGrid</small>
-                        </div>
-                    </div>
-                    <div class="col-md-6">
-                        <div class="mb-3">
-                            <label for="smtp_from_email" class="form-label">From Email</label>
-                            <input type="email" class="form-control" id="smtp_from_email" name="smtp_from_email" value="{{ smtp.smtp_from_email or '' }}" placeholder="your@email.com">
-                            <small class="text-muted">Must be verified in SendGrid</small>
-                        </div>
-                    </div>
-                </div>
-                <button type="submit" class="btn btn-primary">Save SendGrid Settings</button>
-            </form>
-        </div>
+    <div class="alert alert-success">
+        <strong>Mailjet:</strong> 6,000 free emails/month, no credit card required!
+        <br>SMTP: in-v3.mailjet.com | Port: 587 | TLS: enabled
     </div>
 
     <div class="card mb-4">
         <div class="card-header bg-success text-white">
-            <h5>Mailgun (5,000 free emails/month)</h5>
+            <h5>Mailjet (Recommended - 6,000 free emails/month)</h5>
         </div>
         <div class="card-body">
             <form method="POST">
-                <div class="mb-3 form-check">
-                    <input type="checkbox" class="form-check-input" id="mailgun_enabled" name="mailgun_enabled" value="1" {% if smtp.mailgun_enabled %}checked{% endif %}>
-                    <label class="form-check-label" for="mailgun_enabled">Enable Mailgun</label>
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label for="smtp_server" class="form-label">SMTP Server</label>
+                            <input type="text" class="form-control" id="smtp_server" name="smtp_server" value="{{ smtp.smtp_server or 'in-v3.mailjet.com' }}">
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label for="smtp_port" class="form-label">Port</label>
+                            <input type="number" class="form-control" id="smtp_port" name="smtp_port" value="{{ smtp.smtp_port or 587 }}">
+                        </div>
+                    </div>
                 </div>
                 <div class="row">
                     <div class="col-md-6">
                         <div class="mb-3">
-                            <label for="mailgun_domain" class="form-label">Mailgun Domain</label>
-                            <input type="text" class="form-control" id="mailgun_domain" name="mailgun_domain" value="{{ smtp.mailgun_domain or '' }}" placeholder="yourdomain.com">
+                            <label for="smtp_username" class="form-label">API Key (as username)</label>
+                            <input type="text" class="form-control" id="smtp_username" name="smtp_username" value="{{ smtp.smtp_username or '' }}">
+                            <small class="text-muted">Found in Mailjet → Account → API Keys</small>
                         </div>
                     </div>
                     <div class="col-md-6">
                         <div class="mb-3">
-                            <label for="mailgun_api_key" class="form-label">Mailgun API Key</label>
-                            <input type="password" class="form-control" id="mailgun_api_key" name="mailgun_api_key" value="{{ smtp.mailgun_api_key or '' }}" placeholder="key-xxxxxxxx">
+                            <label for="smtp_password" class="form-label">API Secret (as password)</label>
+                            <input type="password" class="form-control" id="smtp_password" name="smtp_password" value="{{ smtp.smtp_password or '' }}">
                         </div>
                     </div>
                 </div>
-                <button type="submit" class="btn btn-success">Save Mailgun Settings</button>
+                <div class="mb-3">
+                    <label for="smtp_from_email" class="form-label">From Email</label>
+                    <input type="email" class="form-control" id="smtp_from_email" name="smtp_from_email" value="{{ smtp.smtp_from_email or '' }}">
+                </div>
+                <div class="mb-3 form-check">
+                    <input type="checkbox" class="form-check-input" id="use_tls" name="use_tls" value="1" {% if smtp.use_tls != False %}checked{% endif %}>
+                    <label class="form-check-label" for="use_tls">Use TLS (recommended)</label>
+                </div>
+                <button type="submit" class="btn btn-success">Save Mailjet Settings</button>
             </form>
         </div>
     </div>
 
     <div class="card">
         <div class="card-header">
-            <h5>Regular SMTP (limited - not recommended for bulk)</h5>
+            <h5>Other SMTP Providers</h5>
         </div>
         <div class="card-body">
             <form method="POST">
+                <div class="alert alert-info">
+                    <strong>Gmail:</strong> smtp.gmail.com, port 587 (need App Password)<br>
+                    <strong>Outlook:</strong> smtp.office365.com, port 587<br>
+                    <strong>Yahoo:</strong> smtp.mail.yahoo.com, port 587
+                </div>
                 <div class="row">
                     <div class="col-md-6">
                         <div class="mb-3">
@@ -105,11 +99,15 @@
                         </div>
                     </div>
                 </div>
+                <div class="mb-3">
+                    <label for="smtp_from_email" class="form-label">From Email</label>
+                    <input type="email" class="form-control" id="smtp_from_email" name="smtp_from_email" value="{{ smtp.smtp_from_email or '' }}">
+                </div>
                 <div class="mb-3 form-check">
                     <input type="checkbox" class="form-check-input" id="use_tls" name="use_tls" value="1" {% if smtp.use_tls != False %}checked{% endif %}>
                     <label class="form-check-label" for="use_tls">Use TLS</label>
                 </div>
-                <button type="submit" class="btn btn-secondary">Save SMTP Settings</button>
+                <button type="submit" class="btn btn-primary">Save Settings</button>
             </form>
         </div>
     </div>
