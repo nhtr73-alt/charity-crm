@@ -399,7 +399,13 @@ function getAttachmentLinks() {
 }
 
 function prepareAndSendEmails() {
-    const recipientIds = Array.from(document.querySelectorAll('input[name="recipients"]:checked')).map(cb => cb.value);
+    console.log('Prepare and send clicked');
+    
+    const recipientCheckboxes = document.querySelectorAll('input[name="recipients"]:checked');
+    const recipientIds = Array.from(recipientCheckboxes).map(cb => cb.value);
+    
+    console.log('Selected recipients:', recipientIds);
+    console.log('allContacts:', allContacts);
     
     if (recipientIds.length === 0) {
         alert('Please select at least one recipient');
@@ -412,25 +418,39 @@ function prepareAndSendEmails() {
         return;
     }
     
+    console.log('Subject:', subject);
+    
     const selectedContacts = allContacts.filter(c => recipientIds.includes(String(c.id)));
+    console.log('Matched contacts:', selectedContacts);
+    
+    if (selectedContacts.length === 0) {
+        alert('No matching contacts found');
+        return;
+    }
+    
     const attachmentLinks = getAttachmentLinks();
     
     if (selectedContacts.length === 1) {
         const contact = selectedContacts[0];
-        let personalizedSubject = subject.replace(/{{first_name}}/g, contact.first_name)
-            .replace(/{{last_name}}/g, contact.last_name);
+        console.log('Sending to:', contact.email);
         
-        let html = richEditor.getHtml();
-        html = html.replace(/{{first_name}}/g, contact.first_name)
-                   .replace(/{{last_name}}/g, contact.last_name)
-                   .replace(/{{email}}/g, contact.email)
+        let personalizedSubject = subject.replace(/{{first_name}}/g, contact.first_name || '')
+            .replace(/{{last_name}}/g, contact.last_name || '');
+        
+        let html = richEditor.getHtml() || '';
+        html = html.replace(/{{first_name}}/g, contact.first_name || '')
+                   .replace(/{{last_name}}/g, contact.last_name || '')
+                   .replace(/{{email}}/g, contact.email || '')
                    .replace(/{{company}}/g, contact.company || '');
         
         if (attachmentLinks) html += attachmentLinks;
         
-        window.location.href = `mailto:${contact.email}?subject=${encodeURIComponent(personalizedSubject)}&body=${encodeURIComponent(html)}`;
+        const mailtoUrl = `mailto:${contact.email}?subject=${encodeURIComponent(personalizedSubject)}&body=${encodeURIComponent(html)}`;
+        console.log('Mailto URL:', mailtoUrl);
+        
+        window.location.href = mailtoUrl;
     } else {
-        let batchHtml = '<html><body><h3>Prepared Emails</h3>';
+        let batchHtml = '<html><body><h3>Prepared Emails - Click to Send</h3>';
         
         if (selectedAttachmentIds.length > 0) {
             batchHtml += '<p><strong>Attachments:</strong> ' + 
@@ -440,21 +460,21 @@ function prepareAndSendEmails() {
         batchHtml += '<ul>';
         
         selectedContacts.forEach(contact => {
-            let personalizedSubject = subject.replace(/{{first_name}}/g, contact.first_name)
-                .replace(/{{last_name}}/g, contact.last_name);
+            let personalizedSubject = subject.replace(/{{first_name}}/g, contact.first_name || '')
+                .replace(/{{last_name}}/g, contact.last_name || '');
             
-            let html = richEditor.getHtml();
-            html = html.replace(/{{first_name}}/g, contact.first_name)
-                       .replace(/{{last_name}}/g, contact.last_name)
-                       .replace(/{{email}}/g, contact.email)
+            let html = richEditor.getHtml() || '';
+            html = html.replace(/{{first_name}}/g, contact.first_name || '')
+                       .replace(/{{last_name}}/g, contact.last_name || '')
+                       .replace(/{{email}}/g, contact.email || '')
                        .replace(/{{company}}/g, contact.company || '');
             
             if (attachmentLinks) html += attachmentLinks;
             
-            batchHtml += `<li><a href="mailto:${contact.email}?subject=${encodeURIComponent(personalizedSubject)}&body=${encodeURIComponent(html)}" target="_blank">${contact.first_name} ${contact.last_name} (${contact.email})</a></li>`;
+            batchHtml += `<li><a href="mailto:${contact.email}?subject=${encodeURIComponent(personalizedSubject)}&body=${encodeURIComponent(html)}" target="_blank">${contact.first_name} ${contact.last_name} - ${contact.email}</a></li>`;
         });
         
-        batchHtml += '</ul></body></html>';
+        batchHtml += '</ul><p>Click each link to open in your email client.</p></body></html>';
         
         const win = window.open('', '_blank');
         win.document.write(batchHtml);
