@@ -257,7 +257,25 @@ def contact_add():
         )
         db.session.add(contact)
         db.session.commit()
-        flash('Contact added successfully!', 'success')
+
+        files = request.files.getlist('documents')
+        for file in files:
+            if file.filename and allowed_file(file.filename):
+                doc = Document(
+                    contact_id=contact.id,
+                    original_filename=file.filename,
+                    document_type=request.form.get('document_type', 'Other'),
+                    file_data=file.read(),
+                    content_type=file.content_type,
+                    uploaded_by=current_user.id
+                )
+                db.session.add(doc)
+
+        if files and files[0].filename:
+            db.session.commit()
+            flash('Contact added with documents!', 'success')
+        else:
+            flash('Contact added successfully!', 'success')
         return redirect(url_for('contacts_list'))
 
     return render_template('contact_form.html', categories=DEFAULT_CATEGORIES, sub_categories=sub_categories, contact={})

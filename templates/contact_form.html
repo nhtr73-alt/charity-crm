@@ -6,7 +6,7 @@
 <div class="form-page">
     <h1>{% if contact %}Edit Contact{% else %}Add Contact{% endif %}</h1>
 
-    <form method="POST" class="contact-form">
+    <form method="POST" class="contact-form" enctype="multipart/form-data">
         <div class="row">
             <div class="col-md-6">
                 <div class="mb-3">
@@ -79,6 +79,29 @@
         <div class="mb-3">
             <label for="notes" class="form-label">Notes</label>
             <textarea class="form-control" id="notes" name="notes" rows="4">{{ contact.notes or '' }}</textarea>
+        </div>
+
+        <div class="card mb-3">
+            <div class="card-header">
+                <h5>Documents (optional)</h5>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <label for="documents" class="form-label">Upload Documents</label>
+                    <input type="file" class="form-control" id="documents" name="documents" multiple>
+                    <small class="text-muted">PDF, DOC, DOCX, XLS, XLSX, PNG, JPG (multiple files allowed)</small>
+                </div>
+                <div class="mb-3">
+                    <label for="document_type" class="form-label">Document Type</label>
+                    <select class="form-select" id="document_type" name="document_type">
+                        <option value="Other">Other</option>
+                        <option value="Booking Form">Booking Form</option>
+                        <option value="Invoice">Invoice</option>
+                        <option value="Receipt">Receipt</option>
+                        <option value="ID">ID / Passport</option>
+                    </select>
+                </div>
+            </div>
         </div>
 
         <div class="form-actions">
