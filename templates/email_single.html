@@ -19,8 +19,13 @@
                     <label for="body" class="form-label">Message</label>
                     <textarea class="form-control" id="body" name="body" rows="6" required></textarea>
                 </div>
+                <div class="mb-3 form-check">
+                    <input type="checkbox" class="form-check-input" id="use_smtp" name="use_smtp" value="send">
+                    <label class="form-check-label" for="use_smtp">Send via SMTP</label>
+                    <small class="text-muted d-block"><a href="{{ url_for('settings') }}">Configure SMTP first</a></small>
+                </div>
                 <button type="submit" class="btn btn-primary">
-                    <i class="bi bi-envelope"></i> Prepare Email
+                    <i class="bi bi-envelope"></i> Send Email
                 </button>
                 <a href="{{ url_for('contact_detail', contact_id=contact.id) }}" class="btn btn-outline-secondary">Cancel</a>
             </form>

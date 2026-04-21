@@ -11,9 +11,11 @@ from email.mime.multipart import MIMEMultipart
 from models import db, Contact, ContactNote, Category
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = 'charity-crm-secret-key-2024'
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///charity_crm.db'
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'charity-crm-secret-key-2024')
+app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///charity_crm.db')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['ENV'] = 'production'
+app.config['DEBUG'] = False
 
 db.init_app(app)
 
@@ -29,6 +31,17 @@ class User(UserMixin, db.Model):
     email = db.Column(db.String(255))
     is_admin = db.Column(db.Boolean, default=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+class SMTPSettings(db.Model):
+    __tablename__ = 'smtp_settings'
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), unique=True)
+    smtp_server = db.Column(db.String(255))
+    smtp_port = db.Column(db.Integer, default=587)
+    smtp_username = db.Column(db.String(255))
+    smtp_password = db.Column(db.String(255))
+    smtp_from_email = db.Column(db.String(255))
+    use_tls = db.Column(db.Boolean, default=True)
 
 @login_manager.user_loader
 def load_user(user_id):
@@ -407,6 +420,8 @@ def email_page():
     else:
         all_contacts = Contact.query.all()
 
+    use_smtp = request.form.get('use_smtp') == 'send'
+
     if request.method == 'POST':
         recipient_ids = request.form.getlist('recipients')
         recipients = Contact.query.filter(Contact.id.in_(recipient_ids)).all()
@@ -421,11 +436,23 @@ def email_page():
             flash('Subject and body are required.', 'error')
             return redirect(url_for('email_page'))
 
-        emails = [r.email for r in recipients]
-        session['bulk_emails'] = emails
-        session['email_subject'] = subject
-        session['email_body'] = body
-        flash(f'{len(emails)} email(s) queued. Use your email client to send.', 'success')
+        if use_smtp:
+            success_count = 0
+            error_count = 0
+            for recipient in recipients:
+                ok, msg = send_smtp_email(recipient.email, subject, body, current_user.id)
+                if ok:
+                    success_count += 1
+                else:
+                    error_count += 1
+            flash(f'Emails sent: {success_count}, Failed: {error_count}', 'success')
+        else:
+            emails = [r.email for r in recipients]
+            session['bulk_emails'] = emails
+            session['email_subject'] = subject
+            session['email_body'] = body
+            flash(f'{len(emails)} email(s) queued. Use your email client to send.', 'success')
+
         return redirect(url_for('email_page'))
 
     return render_template('email.html', all_contacts=all_contacts, selected_contacts=selected_contacts, selected_ids=[int(r.id) for r in selected_contacts], category_filter=category_filter)
@@ -438,15 +465,24 @@ def send_single_email(contact_id):
     if request.method == 'POST':
         subject = request.form.get('subject', '').strip()
         body = request.form.get('body', '').strip()
+        use_smtp = request.form.get('use_smtp') == 'send'
 
         if not subject or not body:
             flash('Subject and body are required.', 'error')
             return render_template('email_single.html', contact=contact)
 
-        session['single_email'] = contact.email
-        session['email_subject'] = subject
-        session['email_body'] = body
-        flash(f'Email prepared for {contact.email}. Use mailto: link to send.', 'success')
+        if use_smtp:
+            ok, msg = send_smtp_email(contact.email, subject, body, current_user.id)
+            if ok:
+                flash(f'Email sent to {contact.email}!', 'success')
+            else:
+                flash(f'Failed to send: {msg}', 'error')
+        else:
+            session['single_email'] = contact.email
+            session['email_subject'] = subject
+            session['email_body'] = body
+            flash(f'Email prepared for {contact.email}. Use mailto: link to send.', 'success')
+
         return redirect(url_for('contact_detail', contact_id=contact_id))
 
     return render_template('email_single.html', contact=contact)
@@ -458,6 +494,74 @@ def get_unique_sub_categories():
         if contact.sub_category:
             sub_categories.add(contact.sub_category)
     return sorted(list(sub_categories))
+
+def send_smtp_email(recipient_email, subject, body, user_id):
+    settings = SMTPSettings.query.filter_by(user_id=user_id).first()
+    if not settings or not settings.smtp_server:
+        return False, "SMTP not configured"
+
+    try:
+        msg = MIMEMultipart()
+        msg['From'] = settings.smtp_from_email or settings.smtp_username
+        msg['To'] = recipient_email
+        msg['Subject'] = subject
+        msg.attach(MIMEText(body, 'plain'))
+
+        server = smtplib.SMTP(settings.smtp_server, settings.smtp_port)
+        if settings.use_tls:
+            server.starttls()
+        server.login(settings.smtp_username, settings.smtp_password)
+        server.sendmail(settings.smtp_from_email or settings.smtp_username, recipient_email, msg.as_string())
+        server.quit()
+        return True, "Sent"
+    except Exception as e:
+        return False, str(e)
+
+@app.route('/settings', methods=['GET', 'POST'])
+@login_required
+def settings():
+    smtp = SMTPSettings.query.filter_by(user_id=current_user.id).first()
+    if not smtp:
+        smtp = SMTPSettings(user_id=current_user.id)
+        db.session.add(smtp)
+        db.session.commit()
+
+    if request.method == 'POST':
+        smtp.smtp_server = request.form.get('smtp_server', '').strip()
+        smtp.smtp_port = request.form.get('smtp_port', '587').strip()
+        smtp.smtp_username = request.form.get('smtp_username', '').strip()
+        smtp.smtp_password = request.form.get('smtp_password', '').strip()
+        smtp.smtp_from_email = request.form.get('smtp_from_email', '').strip()
+        smtp.use_tls = 'use_tls' in request.form
+        db.session.commit()
+        flash('SMTP settings saved!', 'success')
+        return redirect(url_for('settings'))
+
+    return render_template('settings.html', smtp=smtp)
+
+@app.route('/change-password', methods=['GET', 'POST'])
+@login_required
+def change_password():
+    if request.method == 'POST':
+        current_password = request.form.get('current_password', '')
+        new_password = request.form.get('new_password', '')
+        confirm_password = request.form.get('confirm_password', '')
+
+        user = User.query.get(current_user.id)
+
+        if not check_password_hash(user.password_hash, current_password):
+            flash('Current password is incorrect.', 'error')
+        elif new_password != confirm_password:
+            flash('New passwords do not match.', 'error')
+        elif len(new_password) < 4:
+            flash('Password must be at least 4 characters.', 'error')
+        else:
+            user.password_hash = generate_password_hash(new_password)
+            db.session.commit()
+            flash('Password changed successfully!', 'success')
+            return redirect(url_for('index'))
+
+    return render_template('change_password.html')
 
 @app.context_processor
 def inject_categories():
