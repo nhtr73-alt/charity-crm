@@ -7,36 +7,56 @@
     <h1>Email Editor</h1>
     
     <div class="row mb-3">
-        <div class="col-md-4">
+        <div class="col-md-3">
             <div class="card">
-                <div class="card-header">
+                <div class="card-header d-flex justify-content-between align-items-center">
                     <h5 class="mb-0">Templates</h5>
+                    <button type="button" class="btn btn-sm btn-success" onclick="showSaveTemplateModal()">
+                        <i class="bi bi-save"></i> Save
+                    </button>
                 </div>
                 <div class="card-body">
                     <div class="d-grid gap-2">
-                        <button type="button" class="btn btn-outline-primary" onclick="richEditor.loadTemplate('welcome')">
+                        <button type="button" class="btn btn-outline-primary btn-sm" onclick="richEditor.loadTemplate('welcome')">
                             <i class="bi bi-envelope"></i> Welcome Email
                         </button>
-                        <button type="button" class="btn btn-outline-primary" onclick="richEditor.loadTemplate('newsletter')">
+                        <button type="button" class="btn btn-outline-primary btn-sm" onclick="richEditor.loadTemplate('newsletter')">
                             <i class="bi bi-newspaper"></i> Newsletter
                         </button>
-                        <button type="button" class="btn btn-outline-primary" onclick="richEditor.loadTemplate('event')">
+                        <button type="button" class="btn btn-outline-primary btn-sm" onclick="richEditor.loadTemplate('event')">
                             <i class="bi bi-calendar-event"></i> Event Invite
                         </button>
-                        <button type="button" class="btn btn-outline-primary" onclick="richEditor.loadTemplate('thankyou')">
+                        <button type="button" class="btn btn-outline-primary btn-sm" onclick="richEditor.loadTemplate('thankyou')">
                             <i class="bi bi-heart"></i> Thank You
                         </button>
-                        <button type="button" class="btn btn-outline-secondary" onclick="richEditor.clear()">
+                        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="richEditor.clear()">
                             <i class="bi bi-erase"></i> Clear All
                         </button>
                     </div>
+                    
+                    {% if email_templates %}
+                    <hr>
+                    <h6>Saved Templates</h6>
+                    <div class="d-grid gap-2" style="max-height: 200px; overflow-y: auto;">
+                        {% for template in email_templates %}
+                        <div class="d-flex justify-content-between align-items-center p-2 border rounded">
+                            <button type="button" class="btn btn-sm btn-link text-start p-0" onclick="loadSavedTemplate({{ template.id }})">
+                                {{ template.name }}
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-danger" onclick="deleteTemplate({{ template.id }})">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
                 </div>
             </div>
         </div>
         
-        <div class="col-md-4">
+        <div class="col-md-3">
             <div class="card">
-                <div class="card-header">
+                <div class="card-header d-flex justify-content-between align-items-center">
                     <h5 class="mb-0">Recipients</h5>
                 </div>
                 <div class="card-body">
@@ -48,13 +68,12 @@
                             {% endfor %}
                         </select>
                     </form>
-                    <div class="table-responsive" style="max-height: 200px; overflow-y: auto;">
+                    <div class="table-responsive" style="max-height: 280px; overflow-y: auto;">
                         <table class="table table-sm">
                             <thead>
                                 <tr>
                                     <th><input type="checkbox" id="select-all"></th>
                                     <th>Name</th>
-                                    <th>Email</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -62,7 +81,6 @@
                                 <tr>
                                     <td><input type="checkbox" name="recipients" value="{{ contact.id }}"></td>
                                     <td>{{ contact.first_name }} {{ contact.last_name }}</td>
-                                    <td>{{ contact.email }}</td>
                                 </tr>
                                 {% endfor %}
                             </tbody>
@@ -72,7 +90,24 @@
             </div>
         </div>
         
-        <div class="col-md-4">
+        <div class="col-md-3">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Attachments</h5>
+                    <button type="button" class="btn btn-sm btn-primary" onclick="document.getElementById('attachmentInput').click()">
+                        <i class="bi bi-upload"></i> Upload
+                    </button>
+                    <input type="file" id="attachmentInput" style="display:none" onchange="uploadAttachment(this)" multiple>
+                </div>
+                <div class="card-body">
+                    <div id="attachmentsList" class="d-grid gap-2" style="max-height: 280px; overflow-y: auto;">
+                        <p class="text-muted small">No attachments</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-3">
             <div class="card">
                 <div class="card-header">
                     <h5 class="mb-0">Subject & Preview</h5>
@@ -92,10 +127,7 @@
                         </select>
                     </div>
                     <button type="button" class="btn btn-outline-info btn-sm" onclick="richEditor.preview()">
-                        <i class="bi bi-eye"></i> Preview Email
-                    </button>
-                    <button type="button" class="btn btn-success btn-sm" onclick="richEditor.exportHtml();">
-                        <i class="bi bi-code"></i> Export HTML
+                        <i class="bi bi-eye"></i> Preview
                     </button>
                 </div>
             </div>
@@ -115,11 +147,39 @@
     </div>
 </div>
 
+<!-- Save Template Modal -->
+<div class="modal fade" id="saveTemplateModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Save Template</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label">Template Name</label>
+                    <input type="text" class="form-control" id="templateName" placeholder="My Template">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Subject (optional)</label>
+                    <input type="text" class="form-control" id="templateSubject" placeholder="Email subject">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="saveTemplate()">Save Template</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <link rel="stylesheet" href="{{ url_for('static', filename='rich-editor.css') }}">
 <script src="{{ url_for('static', filename='rich-editor.js') }}"></script>
 <script>
 let richEditor;
 let allContacts = {{ all_contacts|tojson }};
+let currentTemplateId = null;
+let attachments = [];
 
 document.addEventListener('DOMContentLoaded', function() {
     richEditor = new RichEmailBuilder('rich-editor', {
@@ -130,7 +190,138 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('select-all').addEventListener('change', function() {
         document.querySelectorAll('input[name="recipients"]').forEach(cb => cb.checked = this.checked);
     });
+    
+    loadAttachments();
 });
+
+function showSaveTemplateModal() {
+    currentTemplateId = null;
+    document.getElementById('templateName').value = '';
+    document.getElementById('templateSubject').value = document.getElementById('emailSubject').value;
+    var modal = new bootstrap.Modal(document.getElementById('saveTemplateModal'));
+    modal.show();
+}
+
+function saveTemplate() {
+    const name = document.getElementById('templateName').value;
+    const subject = document.getElementById('templateSubject').value;
+    const content = richEditor.getHtml();
+    
+    if (!name) {
+        alert('Please enter a template name');
+        return;
+    }
+    
+    const formData = new FormData();
+    formData.append('name', name);
+    formData.append('subject', subject);
+    formData.append('content', content);
+    if (currentTemplateId) {
+        formData.append('id', currentTemplateId);
+    }
+    
+    fetch('{{ url_for("save_email_template") }}', {
+        method: 'POST',
+        body: formData
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            bootstrap.Modal.getInstance(document.getElementById('saveTemplateModal')).hide();
+            alert('Template saved!');
+            location.reload();
+        } else {
+            alert(data.message);
+        }
+    });
+}
+
+function loadSavedTemplate(id) {
+    fetch('{{ url_for("list_email_templates") }}')
+    .then(r => r.json())
+    .then(data => {
+        const template = data.templates.find(t => t.id === id);
+        if (template) {
+            currentTemplateId = template.id;
+            document.getElementById('emailSubject').value = template.subject || '';
+            richEditor.setHtml(template.content);
+        }
+    });
+}
+
+function deleteTemplate(id) {
+    if (confirm('Delete this template?')) {
+        fetch('{{ url_for("delete_email_template", template_id=0) }}'.replace('0', id), {
+            method: 'POST'
+        })
+        .then(() => location.reload());
+    }
+}
+
+function uploadAttachment(input) {
+    const files = input.files;
+    if (!files.length) return;
+    
+    Array.from(files).forEach(file => {
+        const formData = new FormData();
+        formData.append('file', file);
+        
+        fetch('{{ url_for("upload_attachment") }}', {
+            method: 'POST',
+            body: formData
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                attachments.push({id: data.id, filename: data.filename});
+                renderAttachments();
+            } else {
+                alert(data.message);
+            }
+        });
+    });
+    
+    input.value = '';
+}
+
+function loadAttachments() {
+    fetch('{{ url_for("list_attachments") }}')
+    .then(r => r.json())
+    .then(data => {
+        attachments = data.attachments || [];
+        renderAttachments();
+    });
+}
+
+function renderAttachments() {
+    const list = document.getElementById('attachmentsList');
+    if (attachments.length === 0) {
+        list.innerHTML = '<p class="text-muted small">No attachments</p>';
+        return;
+    }
+    
+    list.innerHTML = attachments.map(a => `
+        <div class="d-flex justify-content-between align-items-center p-2 border rounded">
+            <span class="small text-truncate" style="max-width: 150px;">${a.filename}</span>
+            <button type="button" class="btn btn-sm btn-outline-danger" onclick="deleteAttachment(${a.id})">
+                <i class="bi bi-trash"></i>
+            </button>
+        </div>
+    `).join('');
+}
+
+function deleteAttachment(id) {
+    fetch('{{ url_for("delete_attachment", attachment_id=0) }}'.replace('0', id), {
+        method: 'POST'
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            attachments = attachments.filter(a => a.id !== id);
+            renderAttachments();
+        }
+    });
+}
 
 function previewWith() {
     const contactId = document.getElementById('previewContact').value;

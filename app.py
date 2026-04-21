@@ -9,7 +9,7 @@ import urllib.request
 import urllib.error
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-from models import db, Contact, ContactNote, Category
+from models import db, Contact, ContactNote, Category, EmailTemplate, EmailAttachment
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'charity-crm-secret-key-2024'
@@ -516,7 +516,93 @@ def rich_email():
         all_contacts = Contact.query.all()
     
     contacts_data = [{'id': c.id, 'first_name': c.first_name, 'last_name': c.last_name, 'email': c.email, 'company': c.company} for c in all_contacts]
-    return render_template('rich_email.html', all_contacts=contacts_data, category_filter=category_filter)
+    templates = EmailTemplate.query.order_by(EmailTemplate.updated_at.desc()).all()
+    return render_template('rich_email.html', all_contacts=contacts_data, category_filter=category_filter, email_templates=templates)
+
+@app.route('/email/template/save', methods=['POST'])
+@login_required
+def save_email_template():
+    name = request.form.get('name', '').strip()
+    subject = request.form.get('subject', '').strip()
+    content = request.form.get('content', '').strip()
+    
+    if not name or not content:
+        return {'success': False, 'message': 'Name and content are required'}
+    
+    template_id = request.form.get('id')
+    
+    if template_id:
+        template = EmailTemplate.query.get(template_id)
+        if template:
+            template.name = name
+            template.subject = subject
+            template.content = content
+        else:
+            return {'success': False, 'message': 'Template not found'}
+    else:
+        template = EmailTemplate(name=name, subject=subject, content=content)
+        db.session.add(template)
+    
+    db.session.commit()
+    return {'success': True, 'message': 'Template saved!'}
+
+@app.route('/email/template/delete/<int:template_id>', methods=['POST'])
+@login_required
+def delete_email_template(template_id):
+    template = EmailTemplate.query.get_or_404(template_id)
+    db.session.delete(template)
+    db.session.commit()
+    flash('Template deleted.', 'success')
+    return redirect(url_for('rich_email'))
+
+@app.route('/email/templates')
+@login_required
+def list_email_templates():
+    templates = EmailTemplate.query.order_by(EmailTemplate.updated_at.desc()).all()
+    return {'templates': [{'id': t.id, 'name': t.name, 'subject': t.subject, 'content': t.content} for t in templates]}
+
+@app.route('/email/attachment/upload', methods=['POST'])
+@login_required
+def upload_attachment():
+    if 'file' not in request.files:
+        return {'success': False, 'message': 'No file selected'}
+    
+    file = request.files['file']
+    if file.filename == '':
+        return {'success': False, 'message': 'No file selected'}
+    
+    import os
+    from werkzeug.utils import secure_filename
+    
+    filename = secure_filename(file.filename)
+    upload_folder = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'uploads', 'attachments')
+    os.makedirs(upload_folder, exist_ok=True)
+    
+    filepath = os.path.join(upload_folder, filename)
+    file.save(filepath)
+    
+    attachment = EmailAttachment(filename=filename, filepath=filepath, content_type=file.content_type)
+    db.session.add(attachment)
+    db.session.commit()
+    
+    return {'success': True, 'id': attachment.id, 'filename': filename}
+
+@app.route('/email/attachments')
+@login_required
+def list_attachments():
+    attachments = EmailAttachment.query.order_by(EmailAttachment.created_at.desc()).all()
+    return {'attachments': [{'id': a.id, 'filename': a.filename, 'created_at': a.created_at.isoformat()} for a in attachments]}
+
+@app.route('/email/attachment/<int:attachment_id>/delete', methods=['POST'])
+@login_required
+def delete_attachment(attachment_id):
+    import os
+    attachment = EmailAttachment.query.get_or_404(attachment_id)
+    if os.path.exists(attachment.filepath):
+        os.remove(attachment.filepath)
+    db.session.delete(attachment)
+    db.session.commit()
+    return {'success': True}
 
 def add_email_note(contact_id, subject, body, sent_via='SMTP'):
     from datetime import datetime
