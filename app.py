@@ -17,13 +17,6 @@ ALLOWED_EXTENSIONS = {'pdf', 'doc', 'docx', 'xls', 'xlsx', 'png', 'jpg', 'jpeg'}
 if not os.path.exists(UPLOAD_FOLDER):
     os.makedirs(UPLOAD_FOLDER)
 
-app = Flask(__name__)
-app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'charity-crm-secret-key-2024')
-app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///charity_crm.db')
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['ENV'] = 'production'
-app.config['DEBUG'] = False
-
 db.init_app(app)
 
 login_manager = LoginManager()
@@ -651,4 +644,6 @@ def inject_categories():
     return dict(categories_list=DEFAULT_CATEGORIES, current_user=current_user)
 
 if __name__ == '__main__':
+    if not os.path.exists(UPLOAD_FOLDER):
+        os.makedirs(UPLOAD_FOLDER)
     app.run(debug=True, port=5000)
