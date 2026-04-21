@@ -17,7 +17,7 @@
             <a href="{{ url_for('index') }}" class="{% if request.endpoint == 'index' %}active{% endif %}">
                 <i class="bi bi-house"></i> Dashboard
             </a>
-            {% if current_user.is_admin %}
+            {% if current_user.is_authenticated and current_user.is_admin %}
             <a href="{{ url_for('users') }}" class="{% if request.endpoint == 'users' %}active{% endif %}">
                 <i class="bi bi-person-badge"></i> Users
             </a>
@@ -78,8 +78,10 @@
                 </div>
             </form>
             <div class="user-info">
+                {% if current_user.is_authenticated %}
                 <span>{{ current_user.username }}</span>
                 <a href="{{ url_for('logout') }}" class="btn btn-sm btn-outline-danger">Logout</a>
+                {% endif %}
             </div>
         </header>
 
