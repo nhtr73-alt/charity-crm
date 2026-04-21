@@ -1,6 +1,4 @@
 import os
-import time
-from html import unescape
 from flask import Flask, render_template, request, redirect, url_for, flash, session, make_response
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -14,11 +12,6 @@ from email.mime.multipart import MIMEMultipart
 from models import db, Contact, ContactNote, Category
 
 ALLOWED_EXTENSIONS = {'pdf', 'doc', 'docx', 'xls', 'xlsx', 'png', 'jpg', 'jpeg'}
-
-app = Flask(__name__)
-app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'charity-crm-secret-key-2024')
-app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///charity_crm.db')
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db.init_app(app)
 
@@ -50,7 +43,6 @@ class SMTPSettings(db.Model):
     mailgun_enabled = db.Column(db.Boolean, default=False)
     sendgrid_api_key = db.Column(db.String(255))
     sendgrid_enabled = db.Column(db.Boolean, default=False)
-    use_shared = db.Column(db.Boolean, default=True)
 
 class Document(db.Model):
     __tablename__ = 'documents'
@@ -379,19 +371,6 @@ def contact_edit(contact_id):
         contact.sub_category = request.form.get('sub_category', '').strip()
         contact.notes = request.form.get('notes', '').strip()
 
-        files = request.files.getlist('documents')
-        for file in files:
-            if file.filename and allowed_file(file.filename):
-                doc = Document(
-                    contact_id=contact.id,
-                    original_filename=file.filename,
-                    document_type=request.form.get('document_type', 'Other'),
-                    file_data=file.read(),
-                    content_type=file.content_type,
-                    uploaded_by=current_user.id
-                )
-                db.session.add(doc)
-
         db.session.commit()
         flash('Contact updated successfully!', 'success')
         return redirect(url_for('contact_detail', contact_id=contact.id))
@@ -530,59 +509,6 @@ def categories():
 
     category_counts = {cat: Contact.query.filter_by(category=cat).count() for cat in DEFAULT_CATEGORIES}
     return render_template('categories.html', categories=DEFAULT_CATEGORIES, sub_categories=sub_categories, category_counts=category_counts)
-
-@app.route('/email-compose', methods=['GET', 'POST'])
-@login_required
-def email_compose():
-    contacts = Contact.query.all()
-    templates = EmailTemplate.query.all()
-    templates_json = [{'id': t.id, 'name': t.name, 'subject': t.subject, 'body': t.body} for t in templates]
-
-    if request.method == 'POST':
-        recipient_ids = request.form.getlist('recipients')
-        recipients = Contact.query.filter(Contact.id.in_(recipient_ids)).all()
-        subject = request.form.get('subject', '').strip()
-        body = request.form.get('body', '').strip()
-        use_smtp = request.form.get('use_smtp') == 'send'
-
-        if not recipients:
-            flash('No recipients selected.', 'error')
-            return render_template('email_compose.html', contacts=contacts, templates=templates, templates_json=templates_json)
-
-        if not subject or not body:
-            flash('Subject and message are required.', 'error')
-            return render_template('email_compose.html', contacts=contacts, templates=templates, templates_json=templates_json)
-
-        if use_smtp:
-            success_count = 0
-            error_count = 0
-            for recipient in recipients:
-                personalized_body = body
-                personalized_body = personalized_body.replace('{first_name}', recipient.first_name or '')
-                personalized_body = personalized_body.replace('{last_name}', recipient.last_name or '')
-                personalized_body = personalized_body.replace('{email}', recipient.email or '')
-                personalized_body = personalized_body.replace('{company}', recipient.company or '')
-
-                personalized_body = unescape(personalized_body)
-
-                ok, msg = send_smtp_email(recipient.email, subject, personalized_body, current_user.id)
-                if ok:
-                    success_count += 1
-                else:
-                    error_count += 1
-                time.sleep(1)
-
-            flash(f'Sent: {success_count}, Failed: {error_count}', 'success')
-        else:
-            emails = [r.email for r in recipients]
-            session['bulk_emails'] = emails
-            session['email_subject'] = subject
-            session['email_body'] = body
-            flash(f'{len(emails)} ready in email client.', 'success')
-
-        return redirect(url_for('email_compose'))
-
-    return render_template('email_compose.html', contacts=contacts, templates=templates, templates_json=templates_json)
 
 @app.route('/email', methods=['GET', 'POST'])
 @login_required
@@ -960,20 +886,9 @@ def my_tasks():
     return render_template('my_tasks.html', tasks=tasks)
 
 def send_smtp_email(recipient_email, subject, body, user_id):
-    user_settings = SMTPSettings.query.filter_by(user_id=user_id).first()
-
-    admin_settings = None
-    if current_user.is_admin:
-        admin_settings = user_settings
-    else:
-        admin_user = User.query.filter_by(is_admin=True).first()
-        if admin_user:
-            admin_settings = SMTPSettings.query.filter_by(user_id=admin_user.id).first()
-
-    settings = user_settings or admin_settings
-
+    settings = SMTPSettings.query.filter_by(user_id=user_id).first()
     if not settings:
-        return False, "SMTP not configured. Ask admin to set up email in Settings."
+        return False, "SMTP not configured"
 
     if settings.sendgrid_enabled and settings.sendgrid_api_key:
         return send_sendgrid_email(recipient_email, subject, body, settings)
@@ -982,17 +897,11 @@ def send_smtp_email(recipient_email, subject, body, user_id):
         return send_mailgun_email(recipient_email, subject, body, settings)
 
     if not settings.smtp_server:
-        return False, "SMTP not configured. Ask admin to set up email in Settings."
+        return False, "SMTP not configured"
 
     try:
-        from_email = settings.smtp_from_email or settings.smtp_username
-
-        user_settings = SMTPSettings.query.filter_by(user_id=user_id).first()
-        if user_settings and user_settings.smtp_from_email and not user_settings.use_shared:
-            from_email = user_settings.smtp_from_email
-
         msg = MIMEMultipart()
-        msg['From'] = from_email
+        msg['From'] = settings.smtp_from_email or settings.smtp_username
         msg['To'] = recipient_email
         msg['Subject'] = subject
         msg.attach(MIMEText(body, 'plain'))
@@ -1001,7 +910,7 @@ def send_smtp_email(recipient_email, subject, body, user_id):
         if settings.use_tls:
             server.starttls()
         server.login(settings.smtp_username, settings.smtp_password)
-        server.sendmail(from_email, recipient_email, msg.as_string())
+        server.sendmail(settings.smtp_from_email or settings.smtp_username, recipient_email, msg.as_string())
         server.quit()
         return True, "Sent"
     except Exception as e:
@@ -1130,7 +1039,6 @@ def settings():
         smtp.smtp_password = request.form.get('smtp_password', '').strip()
         smtp.smtp_from_email = request.form.get('smtp_from_email', '').strip()
         smtp.use_tls = 'use_tls' in request.form
-        smtp.use_shared = 'use_shared' in request.form
         db.session.commit()
         flash('SMTP settings saved!', 'success')
         return redirect(url_for('settings'))
