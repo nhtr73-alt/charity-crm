@@ -430,6 +430,21 @@ def email_page():
 
     category_filter = request.args.get('category', '')
 
+    if request.args.get('preview'):
+        contact = Contact.query.get(request.args.get('preview'))
+        if contact:
+            subject = request.args.get('subject', '')
+            body = request.args.get('body', '')
+            body = body.replace('{{first_name}}', contact.first_name)
+            body = body.replace('{{last_name}}', contact.last_name)
+            body = body.replace('{{full_name}}', f'{contact.first_name} {contact.last_name}')
+            body = body.replace('{{email}}', contact.email)
+            body = body.replace('{{company}}', contact.company or '')
+            subject = subject.replace('{{first_name}}', contact.first_name)
+            subject = subject.replace('{{last_name}}', contact.last_name)
+            subject = subject.replace('{{full_name}}', f'{contact.first_name} {contact.last_name}')
+            return render_template('email_preview.html', contact=contact, subject=subject, body=body)
+
     if category_filter:
         all_contacts = Contact.query.filter_by(category=category_filter).all()
     else:
@@ -449,14 +464,32 @@ def email_page():
             flash('Subject and body are required.', 'error')
             return redirect(url_for('email_page'))
 
+        personalized_emails = []
         for recipient in recipients:
-            add_email_note(recipient.id, subject, body, 'Bulk Email')
+            personalized_body = body
+            personalized_body = personalized_body.replace('{{first_name}}', recipient.first_name)
+            personalized_body = personalized_body.replace('{{last_name}}', recipient.last_name)
+            personalized_body = personalized_body.replace('{{full_name}}', f'{recipient.first_name} {recipient.last_name}')
+            personalized_body = personalized_body.replace('{{email}}', recipient.email)
+            personalized_body = personalized_body.replace('{{company}}', recipient.company or '')
 
-        emails = [r.email for r in recipients]
-        session['bulk_emails'] = emails
+            personalized_subject = subject
+            personalized_subject = personalized_subject.replace('{{first_name}}', recipient.first_name)
+            personalized_subject = personalized_subject.replace('{{last_name}}', recipient.last_name)
+            personalized_subject = personalized_subject.replace('{{full_name}}', f'{recipient.first_name} {recipient.last_name}')
+
+            add_email_note(recipient.id, f"Subject: {personalized_subject}\n\n{personalized_body}", 'Bulk Email')
+            personalized_emails.append({
+                'email': recipient.email,
+                'name': f'{recipient.first_name} {recipient.last_name}',
+                'subject': personalized_subject,
+                'body': personalized_body
+            })
+
+        session['bulk_emails'] = personalized_emails
         session['email_subject'] = subject
         session['email_body'] = body
-        flash(f'{len(emails)} email(s) queued and logged to contact notes. Use your email client to send.', 'success')
+        flash(f'{len(personalized_emails)} email(s) prepared with personalization!', 'success')
         return redirect(url_for('email_page'))
 
     return render_template('email.html', all_contacts=all_contacts, selected_contacts=selected_contacts, selected_ids=[int(r.id) for r in selected_contacts], category_filter=category_filter)

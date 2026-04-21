@@ -6,18 +6,16 @@
 <div class="email-page">
     <h1>Send Email</h1>
 
-    {% if session.get('bulk_emails') or session.get('single_email') %}
-    <div class="alert alert-info">
-        <strong>Email Prepared!</strong><br>
-        Subject: {{ session.get('email_subject') }}<br>
-        {% if session.get('bulk_emails') %}
-        Recipients: {{ session.get('bulk_emails')|join(', ') }}
-        {% else %}
-        Recipient: {{ session.get('single_email') }}
-        {% endif %}
-        <br><br>
-        <a href="mailto:?subject={{ session.get('email_subject') }}&body={{ session.get('email_body')|urlencode }}"
-           class="btn btn-primary">Open in Email Client</a>
+    {% if session.get('bulk_emails') %}
+    <div class="alert alert-success">
+        <strong>{{ session.get('bulk_emails')|length }} Email(s) Prepared!</strong><br>
+        Original Subject: {{ session.get('email_subject') }}<br>
+        <br>
+        <strong>Click to send personalized email:</strong><br>
+        {% for item in session.get('bulk_emails', []) %}
+        <a href="mailto:{{ item.email }}?subject={{ item.subject|urlencode }}&body={{ item.body|urlencode }}" 
+           class="btn btn-sm btn-outline-primary mb-1">{{ item.name }} &lt;{{ item.email }}&gt;</a>
+        {% endfor %}
     </div>
     {% endif %}
 
@@ -69,6 +67,30 @@
 
                 <div class="mt-4">
                     <h5>Email Content</h5>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Insert Variable</label>
+                        <div class="btn-group" role="group">
+                            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="insertVariable('{{first_name}}')">First Name</button>
+                            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="insertVariable('{{last_name}}')">Last Name</button>
+                            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="insertVariable('{{full_name}}')">Full Name</button>
+                            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="insertVariable('{{email}}')">Email</button>
+                            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="insertVariable('{{company}}')">Company</button>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Quick Templates</label>
+                        <select class="form-select" id="templateSelect" onchange="loadTemplate()">
+                            <option value="">-- Select a template --</option>
+                            <option value="welcome">Welcome Email</option>
+                            <option value="newsletter">Newsletter</option>
+                            <option value="event">Event Invitation</option>
+                            <option value="thankyou">Thank You</option>
+                            <option value="followup">Follow Up</option>
+                        </select>
+                    </div>
+
                     <div class="mb-3">
                         <label for="subject" class="form-label">Subject</label>
                         <input type="text" class="form-control" id="subject" name="subject" required>
@@ -77,8 +99,20 @@
                         <label for="body" class="form-label">Message</label>
                         <textarea class="form-control" id="body" name="body" rows="6" required></textarea>
                     </div>
+                    <div class="mb-3">
+                        <label class="form-label">Preview with contact:</label>
+                        <div class="input-group">
+                            <select name="preview_contact" id="previewContact" class="form-select">
+                                <option value="">Select a contact to preview...</option>
+                                {% for contact in all_contacts %}
+                                <option value="{{ contact.id }}">{{ contact.first_name }} {{ contact.last_name }} ({{ contact.email }})</option>
+                                {% endfor %}
+                            </select>
+                            <button type="button" class="btn btn-outline-info" onclick="previewEmail()">Preview</button>
+                        </div>
+                    </div>
                     <button type="submit" class="btn btn-primary">
-                        <i class="bi bi-envelope"></i> Prepare Email
+                        <i class="bi bi-envelope"></i> Prepare All Emails
                     </button>
                 </div>
             </form>
@@ -90,6 +124,58 @@
 </div>
 
 <script>
+function previewEmail() {
+    const contactId = document.getElementById('previewContact').value;
+    const subject = encodeURIComponent(document.getElementById('subject').value);
+    const body = encodeURIComponent(document.getElementById('body').value);
+    if (!contactId) {
+        alert('Please select a contact to preview');
+        return;
+    }
+    window.location.href = `{{ url_for('email_page') }}?preview=${contactId}&subject=${subject}&body=${body}`;
+}
+
+const templates = {
+    welcome: {
+        subject: "Welcome to True Butterflies Foundation",
+        body: "Dear {{first_name}},\n\nWelcome to our community! We're thrilled to have you with us.\n\nBest regards,\nTrue Butterflies Team"
+    },
+    newsletter: {
+        subject: "True Butterflies Foundation Newsletter",
+        body: "Dear {{first_name}},\n\nHere's our latest update...\n\nBest regards,\nTrue Butterflies Team"
+    },
+    event: {
+        subject: "You're Invited: True Butterflies Foundation Event",
+        body: "Dear {{first_name}},\n\nWe'd love to see you at our upcoming event!\n\nBest regards,\nTrue Butterflies Team"
+    },
+    thankyou: {
+        subject: "Thank You from True Butterflies Foundation",
+        body: "Dear {{first_name}},\n\nThank you for your generous support!\n\nWith gratitude,\nTrue Butterflies Team"
+    },
+    followup: {
+        subject: "Following Up - True Butterflies Foundation",
+        body: "Dear {{first_name}},\n\nI wanted to follow up on our recent conversation...\n\nBest regards,\nTrue Butterflies Team"
+    }
+};
+
+function insertVariable(varName) {
+    const body = document.getElementById('body');
+    const start = body.selectionStart;
+    const end = body.selectionEnd;
+    const text = body.value;
+    body.value = text.substring(0, start) + '{{' + varName + '}}' + text.substring(end);
+    body.focus();
+    body.selectionStart = body.selectionEnd = start + varName.length + 4;
+}
+
+function loadTemplate() {
+    const selected = document.getElementById('templateSelect').value;
+    if (selected && templates[selected]) {
+        document.getElementById('subject').value = templates[selected].subject;
+        document.getElementById('body').value = templates[selected].body;
+    }
+}
+
 document.getElementById('select-all').addEventListener('change', function() {
     document.querySelectorAll('input[name="recipients"]').forEach(cb => cb.checked = this.checked);
 });
