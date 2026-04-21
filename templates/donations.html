@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+
+{% block title %}Donations - Charity CRM{% endblock %}
+
+{% block content %}
+<div class="donations-page">
+    <h1>Donations</h1>
+
+    <div class="alert alert-success">
+        <strong>Total:</strong> ${{ "%.2f"|format(total) }}
+    </div>
+
+    <div class="mb-3">
+        <a href="{{ url_for('donations_list', filter='all') }}" class="btn btn-sm btn-outline-primary {% if filter_status == 'all' %}active{% endif %}">All</a>
+        <a href="{{ url_for('donations_list', filter='year') }}" class="btn btn-sm btn-outline-primary {% if filter_status == 'year' %}active{% endif %}">This Year</a>
+    </div>
+
+    {% if donations %}
+    <div class="card">
+        <div class="table-responsive">
+            <table class="table mb-0">
+                <thead>
+                    <tr>
+                        <th>Contact</th>
+                        <th>Amount</th>
+                        <th>Date</th>
+                        <th>Method</th>
+                        <th>Reference</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for d in donations %}
+                    <tr>
+                        <td>
+                            <a href="{{ url_for('contact_detail', contact_id=d.contact_id) }}">{{ d.contact.first_name }} {{ d.contact.last_name }}</a>
+                        </td>
+                        <td><strong>${{ "%.2f"|format(d.amount) }}</strong></td>
+                        <td>{{ d.donation_date.strftime('%Y-%m-%d') }}</td>
+                        <td>{{ d.payment_method or '-' }}</td>
+                        <td>{{ d.payment_reference or '-' }}</td>
+                        <td>
+                            <form method="POST" action="{{ url_for('delete_donation', donation_id=d.id) }}" style="display:inline;">
+                                <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('Delete donation?')">Delete</button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% else %}
+    <p class="text-muted">No donations recorded yet.</p>
+    {% endif %}
+</div>
+{% endblock %}

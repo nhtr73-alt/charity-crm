@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+
+{% block title %}New Sequence - Charity CRM{% endblock %}
+
+{% block content %}
+<div class="sequence-form">
+    <h1>Create Email Sequence</h1>
+
+    <div class="card">
+        <div class="card-body">
+            <form method="POST" id="sequenceForm">
+                <div class="mb-3">
+                    <label for="name" class="form-label">Sequence Name *</label>
+                    <input type="text" class="form-control" id="name" name="name" required>
+                </div>
+                <div class="mb-3">
+                    <label for="description" class="form-label">Description</label>
+                    <textarea class="form-control" id="description" name="description" rows="2"></textarea>
+                </div>
+                <div class="mb-3">
+                    <label for="trigger_type" class="form-label">Trigger</label>
+                    <select class="form-select" id="trigger_type" name="trigger_type">
+                        <option value="">Manual</option>
+                        <option value="signup">On Sign Up</option>
+                        <option value="donation">After Donation</option>
+                        <option value="event">After Event</option>
+                    </select>
+                </div>
+                <div class="mb-3 form-check">
+                    <input type="checkbox" class="form-check-input" id="is_active" name="is_active" checked>
+                    <label class="form-check-label" for="is_active">Active</label>
+                </div>
+
+                <hr>
+                <h4>Email Steps</h4>
+                <div id="steps-container">
+                    <div class="step card mb-3 p-3">
+                        <div class="row">
+                            <div class="col-md-2">
+                                <label>Delay (days)</label>
+                                <input type="number" class="form-control" name="step_0_delay" value="0" min="0">
+                            </div>
+                            <div class="col-md-5">
+                                <label>Subject</label>
+                                <input type="text" class="form-control" name="step_0_subject" placeholder="Email subject">
+                            </div>
+                            <div class="col-md-5">
+                                <label>Body</label>
+                                <textarea class="form-control" name="step_0_body" rows="2" placeholder="Email body (use {{first_name}}, {{last_name}})"></textarea>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <button type="button" class="btn btn-outline-secondary mb-3" onclick="addStep()">+ Add Step</button>
+
+                <input type="hidden" name="step_count" id="stepCount" value="1">
+
+                <button type="submit" class="btn btn-primary">Save Sequence</button>
+                <a href="{{ url_for('email_sequences') }}" class="btn btn-outline-secondary">Cancel</a>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+let stepCount = 1;
+
+function addStep() {
+    const container = document.getElementById('steps-container');
+    const div = document.createElement('div');
+    div.className = 'step card mb-3 p-3';
+    div.innerHTML = `
+        <div class="row">
+            <div class="col-md-2">
+                <label>Delay (days)</label>
+                <input type="number" class="form-control" name="step_${stepCount}_delay" value="0" min="0">
+            </div>
+            <div class="col-md-5">
+                <label>Subject</label>
+                <input type="text" class="form-control" name="step_${stepCount}_subject" placeholder="Email subject">
+            </div>
+            <div class="col-md-5">
+                <label>Body</label>
+                <textarea class="form-control" name="step_${stepCount}_body" rows="2" placeholder="Email body"></textarea>
+            </div>
+        </div>
+    `;
+    container.appendChild(div);
+    document.getElementById('stepCount').value = stepCount;
+    stepCount++;
+}
+</script>
+{% endblock %}

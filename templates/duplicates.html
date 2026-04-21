@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+
+{% block title %}Duplicate Contacts - Charity CRM{% endblock %}
+
+{% block content %}
+<div class="duplicates-page">
+    <h1>Potential Duplicates</h1>
+    <p>These contacts may be duplicates based on email, name, and phone matching.</p>
+
+    {% if duplicates %}
+    <div class="accordion" id="dupAccordion">
+        {% for dup in duplicates %}
+        <div class="accordion-item mb-3">
+            <h2 class="accordion-header">
+                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#dup{{loop.index}}">
+                    <strong>{{ dup.contact1.full_name }}</strong> ↔ <strong>{{ dup.contact2.full_name }}</strong>
+                    <span class="badge bg-warning ms-2">{{ dup.score }}% match</span>
+                </button>
+            </h2>
+            <div id="dup{{loop.index}}" class="accordion-collapse collapse">
+                <div class="accordion-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h5>{{ dup.contact1.full_name }}</h5>
+                            <p>Email: {{ dup.contact1.email }}</p>
+                            <p>Phone: {{ dup.contact1.phone or '-' }}</p>
+                            <p>Category: {{ dup.contact1.category }}</p>
+                            <a href="{{ url_for('contact_detail', contact_id=dup.contact1.id) }}" class="btn btn-sm btn-outline-primary">View</a>
+                        </div>
+                        <div class="col-md-6">
+                            <h5>{{ dup.contact2.full_name }}</h5>
+                            <p>Email: {{ dup.contact2.email }}</p>
+                            <p>Phone: {{ dup.contact2.phone or '-' }}</p>
+                            <p>Category: {{ dup.contact2.category }}</p>
+                            <a href="{{ url_for('contact_detail', contact_id=dup.contact2.id) }}" class="btn btn-sm btn-outline-primary">View</a>
+                        </div>
+                    </div>
+                    <hr>
+                    <form method="POST" action="{{ url_for('merge_duplicates') }}">
+                        <input type="hidden" name="keep_id" value="{{ dup.contact1.id }}">
+                        <input type="hidden" name="merge_id" value="{{ dup.contact2.id }}">
+                        <button type="submit" class="btn btn-danger" onclick="return confirm('Keep {{dup.contact1.full_name}} and merge {{dup.contact2.full_name}} into it?')">
+                            Merge: Keep {{dup.contact1.last_name}}, Merge {{dup.contact2.last_name}}
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <p class="text-muted">No potential duplicates found. Your contact database looks clean!</p>
+    {% endif %}
+</div>
+{% endblock %}

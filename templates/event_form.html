@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+
+{% block title %}New Event - Charity CRM{% endblock %}
+
+{% block content %}
+<div class="event-form">
+    <h1>{% if event %}Edit Event{% else %}Create Event{% endif %}</h1>
+
+    <div class="card">
+        <div class="card-body">
+            <form method="POST">
+                <div class="mb-3">
+                    <label for="name" class="form-label">Event Name *</label>
+                    <input type="text" class="form-control" id="name" name="name" value="{{ event.name if event else '' }}" required>
+                </div>
+                <div class="mb-3">
+                    <label for="description" class="form-label">Description</label>
+                    <textarea class="form-control" id="description" name="description" rows="3">{{ event.description if event else '' }}</textarea>
+                </div>
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label for="event_date" class="form-label">Date & Time</label>
+                            <input type="datetime-local" class="form-control" id="event_date" name="event_date" value="{{ event.event_date.strftime('%Y-%m-%dT%H:%M') if event and event.event_date else '' }}">
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label for="event_type" class="form-label">Event Type</label>
+                            <select class="form-select" id="event_type" name="event_type">
+                                <option value="">-- Select --</option>
+                                <option value="Fundraiser">Fundraiser</option>
+                                <option value="Gala">Gala</option>
+                                <option value="Workshop">Workshop</option>
+                                <option value="Meeting">Meeting</option>
+                                <option value="Volunteer Day">Volunteer Day</option>
+                                <option value="Other">Other</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label for="location" class="form-label">Location</label>
+                            <input type="text" class="form-control" id="location" name="location" value="{{ event.location if event else '' }}">
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label for="capacity" class="form-label">Capacity</label>
+                            <input type="number" class="form-control" id="capacity" name="capacity" value="{{ event.capacity if event else '' }}">
+                        </div>
+                    </div>
+                </div>
+                <button type="submit" class="btn btn-primary">Save Event</button>
+                <a href="{{ url_for('events_list') }}" class="btn btn-outline-secondary">Cancel</a>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

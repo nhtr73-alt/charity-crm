@@ -67,6 +67,33 @@
                     <label class="form-check-label" for="use_tls">Use TLS (SMTP only)</label>
                 </div>
                 <button type="submit" class="btn btn-primary">Save All Settings</button>
+                <button type="button" class="btn btn-outline-success ms-2" data-bs-toggle="modal" data-bs-target="#testEmailModal">
+                    Send Test Email
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="testEmailModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Send Test Email</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="{{ url_for('test_email') }}">
+                <div class="modal-body">
+                    <p>Send a test email to verify your email configuration.</p>
+                    <div class="mb-3">
+                        <label for="test_email" class="form-label">Test Email Address</label>
+                        <input type="email" class="form-control" id="test_email" name="test_email" required placeholder="your@email.com">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-success">Send Test</button>
+                </div>
             </form>
         </div>
     </div>

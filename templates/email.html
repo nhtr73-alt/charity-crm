@@ -11,10 +11,21 @@
         <strong>{{ session.get('bulk_emails')|length }} Email(s) Prepared!</strong><br>
         Original Subject: {{ session.get('email_subject') }}<br>
         <br>
-        <strong>Click to send personalized email:</strong><br>
+        <form method="POST" action="{{ url_for('send_all_emails') }}" class="d-inline">
+            <button type="submit" class="btn btn-success">
+                <i class="bi bi-send"></i> Send All Emails
+            </button>
+        </form>
+        <button type="button" class="btn btn-outline-secondary ms-2" data-bs-toggle="modal" data-bs-target="#attachmentsModal">
+            <i class="bi bi-paperclip"></i> Attachments
+        </button>
+        <button type="button" class="btn btn-outline-danger ms-2" onclick="clearPreparedEmails()">
+            Clear
+        </button>
+        <hr>
+        <small>Recipients:</small><br>
         {% for item in session.get('bulk_emails', []) %}
-        <a href="mailto:{{ item.email }}?subject={{ item.subject|urlencode }}&body={{ item.body|urlencode }}" 
-           class="btn btn-sm btn-outline-primary mb-1">{{ item.name }} &lt;{{ item.email }}&gt;</a>
+        <span class="badge bg-light text-dark mb-1">{{ item.name }} &lt;{{ item.email }}&gt;</span>
         {% endfor %}
     </div>
     {% endif %}
@@ -179,5 +190,38 @@ function loadTemplate() {
 document.getElementById('select-all').addEventListener('change', function() {
     document.querySelectorAll('input[name="recipients"]').forEach(cb => cb.checked = this.checked);
 });
+
+function clearPreparedEmails() {
+    if (confirm('Clear all prepared emails?')) {
+        fetch('{{ url_for("clear_prepared_emails") }}', { method: 'POST' })
+            .then(() => window.location.reload());
+    }
+}
 </script>
+
+<div class="modal fade" id="attachmentsModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Email Attachments</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>Select files to attach to your emails:</p>
+                <div id="attachmentList" class="mb-3">
+                    <div class="text-muted">No attachments uploaded yet.</div>
+                </div>
+                <form id="attachmentUploadForm" enctype="multipart/form-data">
+                    <div class="mb-3">
+                        <input type="file" class="form-control" id="attachmentFile" name="file">
+                    </div>
+                    <button type="button" class="btn btn-outline-primary" onclick="uploadAttachment()">Upload</button>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Done</button>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}

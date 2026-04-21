@@ -1,0 +1,50 @@
+{
+  "contacts": [],
+  "users": [
+    {
+      "id": 1,
+      "username": "admin",
+      "password_hash": "scrypt:32768:8:1$j9cJp93ed2Ka9jyA$ae5c77e9a473714260a83a94f915fafc64959db058304939e061577ddf8081f16c5e6a8073f148bc9adc0ed2655dddf74b5e64302e0bbc8f1ee7e3be1f6f50cc",
+      "email": "admin@charity.org",
+      "is_admin": 1,
+      "created_at": "2026-04-21 20:23:59"
+    }
+  ],
+  "donations": [],
+  "events": [],
+  "tasks": [],
+  "contact_notes": [],
+  "activity_logs": [],
+  "categories": [
+    {
+      "id": 1,
+      "name": "Trader",
+      "is_default": 1
+    },
+    {
+      "id": 2,
+      "name": "Supplier",
+      "is_default": 1
+    },
+    {
+      "id": 3,
+      "name": "Ticket Holder",
+      "is_default": 1
+    },
+    {
+      "id": 4,
+      "name": "Donor",
+      "is_default": 1
+    },
+    {
+      "id": 5,
+      "name": "Volunteer",
+      "is_default": 1
+    },
+    {
+      "id": 6,
+      "name": "General",
+      "is_default": 1
+    }
+  ]
+}

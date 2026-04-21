@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+
+{% block title %}New Task - Charity CRM{% endblock %}
+
+{% block content %}
+<div class="task-form">
+    <h1>{% if task %}Edit Task{% else %}New Task{% endif %}</h1>
+
+    <div class="card">
+        <div class="card-body">
+            <form method="POST">
+                <div class="mb-3">
+                    <label for="title" class="form-label">Task Title *</label>
+                    <input type="text" class="form-control" id="title" name="title" value="{{ task.title if task else '' }}" required>
+                </div>
+                <div class="mb-3">
+                    <label for="description" class="form-label">Description</label>
+                    <textarea class="form-control" id="description" name="description" rows="3">{{ task.description if task else '' }}</textarea>
+                </div>
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label for="contact_id" class="form-label">Related Contact</label>
+                            <select class="form-select" id="contact_id" name="contact_id">
+                                <option value="">-- No contact --</option>
+                                {% for contact in contacts %}
+                                <option value="{{ contact.id }}" {% if task and task.contact_id == contact.id %}selected{% endif %}>{{ contact.full_name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label for="assigned_to" class="form-label">Assigned To</label>
+                            <select class="form-select" id="assigned_to" name="assigned_to">
+                                {% for user in users %}
+                                <option value="{{ user.id }}" {% if task and task.assigned_to == user.id %}selected{% endif %}>{{ user.username }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label for="due_date" class="form-label">Due Date</label>
+                    <input type="date" class="form-control" id="due_date" name="due_date" value="{{ task.due_date.strftime('%Y-%m-%d') if task and task.due_date else '' }}">
+                </div>
+                <button type="submit" class="btn btn-primary">Save Task</button>
+                <a href="{{ url_for('my_tasks') }}" class="btn btn-outline-secondary">Cancel</a>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

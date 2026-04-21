@@ -32,6 +32,30 @@
             <a href="{{ url_for('categories') }}" class="{% if request.endpoint == 'categories' %}active{% endif %}">
                 <i class="bi bi-tags"></i> Categories
             </a>
+            <a href="{{ url_for('show_pipeline') }}" class="{% if request.endpoint == 'show_pipeline' %}active{% endif %}">
+                <i class="bi bi-diagram-3"></i> Pipeline
+            </a>
+            <a href="{{ url_for('my_tasks') }}" class="{% if request.endpoint == 'my_tasks' %}active{% endif %}">
+                <i class="bi bi-check2-square"></i> Tasks
+            </a>
+            <a href="{{ url_for('donations_list') }}" class="{% if request.endpoint == 'donations_list' %}active{% endif %}">
+                <i class="bi bi-cash"></i> Donations
+            </a>
+            <a href="{{ url_for('events_list') }}" class="{% if request.endpoint == 'events_list' %}active{% endif %}">
+                <i class="bi bi-calendar-event"></i> Events
+            </a>
+            <a href="{{ url_for('activity_log') }}" class="{% if request.endpoint == 'activity_log' %}active{% endif %}">
+                <i class="bi bi-history"></i> Activity
+            </a>
+            <a href="{{ url_for('email_sequences') }}" class="{% if request.endpoint == 'email_sequences' %}active{% endif %}">
+                <i class="bi bi-list-ol"></i> Sequences
+            </a>
+            <a href="{{ url_for('email_template_library') }}" class="{% if request.endpoint == 'email_template_library' %}active{% endif %}">
+                <i class="bi bi-file-earmark-text"></i> Templates
+            </a>
+            <a href="{{ url_for('duplicates') }}" class="{% if request.endpoint == 'duplicates' %}active{% endif %}">
+                <i class="bi bi-files"></i> Duplicates
+            </a>
             <a href="{{ url_for('email_page') }}" class="{% if request.endpoint == 'email_page' %}active{% endif %}">
                 <i class="bi bi-envelope"></i> Email
             </a>

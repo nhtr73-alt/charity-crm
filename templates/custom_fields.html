@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+
+{% block title %}Custom Fields - Charity CRM{% endblock %}
+
+{% block content %}
+<div class="custom-fields-page">
+    <h1>Custom Fields</h1>
+    <p>Add custom fields to track additional information about contacts.</p>
+
+    <div class="card mb-3">
+        <div class="card-body">
+            <form method="POST" action="{{ url_for('create_custom_field') }}" class="row">
+                <div class="col-md-4">
+                    <input type="text" class="form-control" name="name" placeholder="Field name" required>
+                </div>
+                <div class="col-md-3">
+                    <select class="form-select" name="field_type">
+                        <option value="text">Text</option>
+                        <option value="number">Number</option>
+                        <option value="date">Date</option>
+                        <option value="select">Dropdown</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <input type="text" class="form-control" name="options" placeholder="Options (comma separated)">
+                </div>
+                <div class="col-md-2">
+                    <button type="submit" class="btn btn-primary w-100">Add</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    {% if fields %}
+    <div class="card">
+        <div class="card-body">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Field Name</th>
+                        <th>Type</th>
+                        <th>Options</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for field in fields %}
+                    <tr>
+                        <td>{{ field.name }}</td>
+                        <td>{{ field.field_type }}</td>
+                        <td>{{ field.options or '-' }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% else %}
+    <p class="text-muted">No custom fields yet.</p>
+    {% endif %}
+</div>
+{% endblock %}

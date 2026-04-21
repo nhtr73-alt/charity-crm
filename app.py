@@ -1,15 +1,18 @@
-from flask import Flask, render_template, request, redirect, url_for, flash, session
+from flask import Flask, render_template, request, redirect, url_for, flash, session, Response
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
+from email.mime.multipart import MIMEMultipart
+from email.mime.base import MIMEBase
+from email.encoders import encode_base64
 import csv
 import io
 import smtplib
 import json
 import urllib.request
 import urllib.error
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
-from models import db, Contact, ContactNote, Category, EmailTemplate, EmailAttachment
+import base64
+from datetime import datetime, date
+from models import db, Contact, ContactNote, Category, EmailTemplateOld as EmailTemplate, EmailAttachment, Task, Donation, Event, EventRegistration, ActivityLog, Tag, ContactTag, EmailSendLog, EmailSequence, ContactSequence, CustomField, DuplicateGroup
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'charity-crm-secret-key-2024'
@@ -54,13 +57,35 @@ with app.app_context():
     try:
         from sqlalchemy import inspect
         inspector = inspect(db.engine)
-        smtp_columns = [col['name'] for col in inspector.get_columns('smtp_settings')]
-
+        
+        if 'contacts' in inspector.get_table_names():
+            contact_columns = [col['name'] for col in inspector.get_columns('contacts')]
+            if 'pipeline_stage' not in contact_columns:
+                db.session.execute(db.text('ALTER TABLE contacts ADD COLUMN pipeline_stage VARCHAR(50) DEFAULT \'New\''))
+            if 'lifecycle_stage' not in contact_columns:
+                db.session.execute(db.text('ALTER TABLE contacts ADD COLUMN lifecycle_stage VARCHAR(50) DEFAULT \'Subscriber\''))
+            if 'engagement_score' not in contact_columns:
+                db.session.execute(db.text('ALTER TABLE contacts ADD COLUMN engagement_score INTEGER DEFAULT 0'))
+            if 'last_email_open' not in contact_columns:
+                db.session.execute(db.text('ALTER TABLE contacts ADD COLUMN last_email_open DATETIME'))
+            if 'last_email_click' not in contact_columns:
+                db.session.execute(db.text('ALTER TABLE contacts ADD COLUMN last_email_click DATETIME'))
+            if 'total_emails_opened' not in contact_columns:
+                db.session.execute(db.text('ALTER TABLE contacts ADD COLUMN total_emails_opened INTEGER DEFAULT 0'))
+            if 'total_emails_clicked' not in contact_columns:
+                db.session.execute(db.text('ALTER TABLE contacts ADD COLUMN total_emails_clicked INTEGER DEFAULT 0'))
+            if 'custom_fields' not in contact_columns:
+                db.session.execute(db.text('ALTER TABLE contacts ADD COLUMN custom_fields TEXT'))
+            db.session.commit()
+        
+        smtp_columns = [col['name'] for col in inspector.get_columns('smtp_settings')] if 'smtp_settings' in inspector.get_table_names() else []
         if 'mailjet_api_key' not in smtp_columns:
-            db.session.execute(db.text('ALTER TABLE smtp_settings ADD COLUMN mailjet_api_key VARCHAR(255)'))
-        if 'mailjet_secret_key' not in smtp_columns:
-            db.session.execute(db.text('ALTER TABLE smtp_settings ADD COLUMN mailjet_secret_key VARCHAR(255)'))
-        db.session.commit()
+            try:
+                db.session.execute(db.text('ALTER TABLE smtp_settings ADD COLUMN mailjet_api_key VARCHAR(255)'))
+                db.session.execute(db.text('ALTER TABLE smtp_settings ADD COLUMN mailjet_secret_key VARCHAR(255)'))
+                db.session.commit()
+            except:
+                pass
     except Exception as e:
         print(f"Migration note: {e}")
 
@@ -494,6 +519,367 @@ def email_page():
 
     return render_template('email.html', all_contacts=all_contacts, selected_contacts=selected_contacts, selected_ids=[int(r.id) for r in selected_contacts], category_filter=category_filter)
 
+@app.route('/email/send_all', methods=['POST'])
+@login_required
+def send_all_emails():
+    from datetime import datetime
+    
+    attachment_ids = request.form.getlist('attachments')
+    attachments = []
+    if attachment_ids:
+        attachments = [{'id': a.id, 'filepath': a.filepath, 'filename': a.filename, 'content_type': a.content_type} 
+                     for a in EmailAttachment.query.filter(EmailAttachment.id.in_(attachment_ids)).all()]
+    
+    bulk_emails = session.get('bulk_emails', [])
+    if not bulk_emails:
+        flash('No emails prepared. Please compose emails first.', 'error')
+        return redirect(url_for('email_page'))
+
+    sent_count = 0
+    failed_count = 0
+    failed_emails = []
+
+    for email_data in bulk_emails:
+        ok, msg = send_smtp_email(email_data['email'], email_data['subject'], email_data['body'], current_user.id, attachments)
+        if ok:
+            sent_count += 1
+            for recipient in Contact.query.filter_by(email=email_data['email']).all():
+                add_email_note(recipient.id, email_data['subject'], email_data['body'], 'Bulk Email')
+        else:
+            failed_count += 1
+            failed_emails.append(f"{email_data['email']}: {msg}")
+
+    session.pop('bulk_emails', None)
+    session.pop('email_subject', None)
+    session.pop('email_body', None)
+
+    if sent_count > 0:
+        flash(f'Successfully sent {sent_count} email(s)!', 'success')
+    if failed_count > 0:
+        for err in failed_emails:
+            flash(f'Failed: {err}', 'error')
+
+    return redirect(url_for('email_page'))
+
+@app.route('/email/test', methods=['POST'])
+@login_required
+def test_email():
+    test_email_addr = request.form.get('test_email', '').strip()
+    
+    if not test_email_addr:
+        flash('Please provide a test email address.', 'error')
+        return redirect(url_for('settings'))
+    
+    ok, msg = send_smtp_email(test_email_addr, "Test Email from Charity CRM", 
+                             "This is a test email to verify your email settings are configured correctly.", 
+                             current_user.id)
+    
+    if ok:
+        flash(f'Test email sent to {test_email_addr}!', 'success')
+    else:
+        flash(f'Test failed: {msg}', 'error')
+    
+    return redirect(url_for('settings'))
+
+@app.route('/email/clear_prepared', methods=['POST'])
+@login_required
+def clear_prepared_emails():
+    session.pop('bulk_emails', None)
+    session.pop('email_subject', None)
+    session.pop('email_body', None)
+    return {'success': True}
+
+
+@app.route('/email/track/open/<int:contact_id>/<message_id>')
+def track_email_open(contact_id, message_id):
+    contact = Contact.query.get(contact_id)
+    if contact:
+        contact.last_email_open = datetime.utcnow()
+        contact.total_emails_opened = (contact.total_emails_opened or 0) + 1
+        contact.engagement_score = (contact.engagement_score or 0) + 5
+        db.session.commit()
+
+        log = EmailSendLog.query.filter_by(contact_id=contact_id, message_id=message_id).first()
+        if log:
+            log.opened_at = datetime.utcnow()
+            db.session.commit()
+
+    pixel = b'R0lGODlhAQABAIAAAAAAAP///yH5BAEAAEALAAAAAABAAEAAAICTAEAOw=='
+    return Response(base64.b64decode(pixel), mimetype='image/gif')
+
+
+@app.route('/email/track/click/<int:contact_id>/<message_id>')
+def track_email_click(contact_id, message_id):
+    contact = Contact.query.get(contact_id)
+    if contact:
+        contact.last_email_click = datetime.utcnow()
+        contact.total_emails_clicked = (contact.total_emails_clicked or 0) + 1
+        contact.engagement_score = (contact.engagement_score or 0) + 10
+        db.session.commit()
+
+        log = EmailSendLog.query.filter_by(contact_id=contact_id, message_id=message_id).first()
+        if log:
+            log.clicked_at = datetime.utcnow()
+            db.session.commit()
+
+    return '', 204
+
+
+@app.route('/sequences')
+@login_required
+def email_sequences():
+    sequences = EmailSequence.query.order_by(EmailSequence.created_at.desc()).all()
+    return render_template('sequences.html', sequences=sequences)
+
+
+@app.route('/sequences/new', methods=['GET', 'POST'])
+@login_required
+def create_sequence():
+    if request.method == 'POST':
+        name = request.form.get('name', '').strip()
+        description = request.form.get('description', '').strip()
+        trigger_type = request.form.get('trigger_type', '').strip()
+
+        if not name:
+            flash('Sequence name is required.', 'error')
+            return redirect(url_for('create_sequence'))
+
+        steps_json = []
+        step_count = int(request.form.get('step_count', 0))
+        for i in range(step_count):
+            step = {
+                'delay_days': int(request.form.get(f'step_{i}_delay', 0)),
+                'subject': request.form.get(f'step_{i}_subject', ''),
+                'body': request.form.get(f'step_{i}_body', '')
+            }
+            if step['subject']:
+                steps_json.append(step)
+
+        sequence = EmailSequence(
+            name=name,
+            description=description,
+            trigger_type=trigger_type,
+            steps=json.dumps(steps_json),
+            is_active='is_active' in request.form
+        )
+        db.session.add(sequence)
+        db.session.commit()
+        flash('Email sequence created!', 'success')
+        return redirect(url_for('email_sequences'))
+
+    return render_template('sequence_form.html', sequence=None)
+
+
+@app.route('/sequences/<int:sequence_id>/enroll', methods=['POST'])
+@login_required
+def enroll_sequence(sequence_id):
+    contact_ids = request.form.getlist('contacts')
+    sequence = EmailSequence.query.get_or_404(sequence_id)
+
+    for cid in contact_ids:
+        existing = ContactSequence.query.filter_by(contact_id=cid, sequence_id=sequence_id).first()
+        if not existing:
+            cs = ContactSequence(contact_id=cid, sequence_id=sequence_id)
+            db.session.add(cs)
+
+    db.session.commit()
+    flash(f'Enrolled {len(contact_ids)} contacts in {sequence.name}', 'success')
+    return redirect(url_for('email_sequences'))
+
+
+@app.route('/sequences/run')
+@login_required
+def run_sequences():
+    now = datetime.utcnow()
+
+    active_sequences = EmailSequence.query.filter_by(is_active=True).all()
+    enrolled = ContactSequence.query.filter_by(paused=False).all()
+
+    results = {'processed': 0, 'sent': 0}
+
+    for cs in enrolled:
+        if not cs.sequence or not cs.sequence.is_active:
+            continue
+
+        steps = json.loads(cs.sequence.steps or '[]')
+        if cs.current_step >= len(steps):
+            cs.completed_at = now
+            cs.paused = True
+            results['processed'] += 1
+            continue
+
+        step = steps[cs.current_step]
+        contact = Contact.query.get(cs.contact_id)
+
+        if not contact:
+            continue
+
+        delay = step.get('delay_days', 0)
+        step_started = cs.started_at or now
+
+        if (now - step_started).days >= delay:
+            personalized_body = step.get('body', '').replace('{{first_name}}', contact.first_name)
+            personalized_body = personalized_body.replace('{{last_name}}', contact.last_name)
+            personalized_body = personalized_body.replace('{{full_name}}', f'{contact.first_name} {contact.last_name}')
+
+            personalized_subject = step.get('subject', '').replace('{{first_name}}', contact.first_name)
+
+            ok, msg = send_smtp_email(contact.email, personalized_subject, personalized_body, current_user.id)
+
+            log = EmailSendLog(contact_id=contact.id, subject=personalized_subject, message_id=f"{cs.id}_{cs.current_step}")
+            db.session.add(log)
+
+            cs.current_step += 1
+            results['processed'] += 1
+            if ok:
+                results['sent'] += 1
+
+    db.session.commit()
+    flash(f'Sequence processor: {results["sent"]} emails sent, {results["processed"]} processed', 'success')
+    return redirect(url_for('email_sequences'))
+
+
+@app.route('/duplicates')
+@login_required
+def duplicates():
+    potential_dups = []
+    contacts = Contact.query.all()
+
+    for i, c1 in enumerate(contacts):
+        for c2 in contacts[i+1:]:
+            score = 0
+            if c1.email.lower() == c2.email.lower():
+                score += 100
+            if c1.first_name.lower() == c2.first_name.lower() and c1.last_name.lower() == c2.last_name.lower():
+                score += 80
+            if c1.phone and c2.phone and c1.phone == c2.phone:
+                score += 50
+
+            if score >= 80:
+                potential_dups.append({'contact1': c1, 'contact2': c2, 'score': score})
+
+    return render_template('duplicates.html', duplicates=potential_dups)
+
+
+@app.route('/duplicates/merge', methods=['POST'])
+@login_required
+def merge_duplicates():
+    keep_id = request.form.get('keep_id', type=int)
+    merge_id = request.form.get('merge_id', type=int)
+
+    keep = Contact.query.get_or_404(keep_id)
+    merge = Contact.query.get_or_404(merge_id)
+
+    notes = ContactNote.query.filter_by(contact_id=merge_id).all()
+    for note in notes:
+        note.contact_id = keep_id
+        db.session.add(note)
+
+    tasks = Task.query.filter_by(contact_id=merge_id).all()
+    for task in tasks:
+        task.contact_id = keep_id
+        db.session.add(task)
+
+    donations = Donation.query.filter_by(contact_id=merge_id).all()
+    for donation in donations:
+        donation.contact_id = keep_id
+        db.session.add(donation)
+
+    db.session.delete(merge)
+    db.session.commit()
+
+    flash(f'Merged into {keep.full_name}', 'success')
+    return redirect(url_for('duplicates'))
+
+
+@app.route('/contact/<int:contact_id>/convert', methods=['POST'])
+@login_required
+def convert_contact_to_donor(contact_id):
+    contact = Contact.query.get_or_404(contact_id)
+    contact.category = 'Donor'
+    if contact.lifecycle_stage == 'Subscriber':
+        contact.lifecycle_stage = 'Lead'
+    elif contact.lifecycle_stage == 'Lead':
+        contact.lifecycle_stage = 'Donor'
+    contact.pipeline_stage = 'Completed'
+    contact.engagement_score = (contact.engagement_score or 0) + 50
+    db.session.commit()
+    log_activity(contact_id, 'Converted to Donor')
+    flash(f'{contact.full_name} converted to Donor', 'success')
+    return redirect(url_for('contact_detail', contact_id=contact_id))
+
+
+@app.route('/custom-fields')
+@login_required
+def custom_fields_list():
+    fields = CustomField.query.all()
+    return render_template('custom_fields.html', fields=fields)
+
+
+@app.route('/custom-fields/new', methods=['POST'])
+@login_required
+def create_custom_field():
+    name = request.form.get('name', '').strip()
+    field_type = request.form.get('field_type', 'text')
+    options = request.form.get('options', '').strip()
+
+    if not name:
+        flash('Field name is required.', 'error')
+        return redirect(url_for('custom_fields_list'))
+
+    field = CustomField(name=name, field_type=field_type, options=options)
+    db.session.add(field)
+    db.session.commit()
+    flash(f'Custom field {name} created!', 'success')
+    return redirect(url_for('custom_fields_list'))
+
+
+@app.route('/score/update', methods=['POST'])
+@login_required
+def update_engagement_scores():
+    for contact in Contact.query.all():
+        score = 0
+
+        score += (contact.total_emails_opened or 0) * 5
+        score += (contact.total_emails_clicked or 0) * 10
+
+        notes_count = contact.contact_notes.count()
+        score += notes_count * 10
+
+        donations = contact.donations.all()
+        total_donated = sum(d.amount for d in donations)
+        if total_donated > 0:
+            score += min(int(total_donated / 10), 100)
+
+        tasks_completed = Task.query.filter_by(contact_id=contact.id, completed=True).count()
+        score += tasks_completed * 20
+
+        contact.engagement_score = score
+
+        if total_donated >= 1000:
+            contact.lifecycle_stage = 'Major Donor'
+        elif total_donated > 0:
+            contact.lifecycle_stage = 'Recurring' if contact.lifecycle_stage in ['Donor', 'Recurring'] else 'Donor'
+        elif score > 100:
+            contact.lifecycle_stage = 'Lead'
+        elif score > 0:
+            contact.lifecycle_stage = 'Subscriber'
+
+    db.session.commit()
+    flash('Engagement scores updated!', 'success')
+    return redirect(url_for('contacts_list'))
+
+
+@app.route('/email/templates/library')
+@login_required
+def email_template_library():
+    category = request.args.get('category', '')
+    if category:
+        templates = EmailTemplate.query.filter_by(category=category).order_by(EmailTemplate.usage_count.desc()).all()
+    else:
+        templates = EmailTemplate.query.order_by(EmailTemplate.usage_count.desc()).all()
+    return render_template('email_templates.html', templates=templates, library=True)
+
 @app.route('/email/builder')
 @login_required
 def email_builder():
@@ -659,7 +1045,7 @@ def get_unique_sub_categories():
             sub_categories.add(contact.sub_category)
     return sorted(list(sub_categories))
 
-def send_smtp_email(recipient_email, subject, body, user_id):
+def send_smtp_email(recipient_email, subject, body, user_id, attachments=None):
     settings = None
     try:
         settings = SMTPSettings.query.filter_by(user_id=user_id).first()
@@ -672,7 +1058,7 @@ def send_smtp_email(recipient_email, subject, body, user_id):
             return False, "SMTP not configured - go to Settings"
 
         if settings.mailjet_api_key and settings.mailjet_secret_key:
-            return send_mailjet_email(recipient_email, subject, body, settings)
+            return send_mailjet_email(recipient_email, subject, body, settings, attachments)
 
         if not settings.smtp_server:
             return False, "SMTP not configured - go to Settings"
@@ -683,6 +1069,18 @@ def send_smtp_email(recipient_email, subject, body, user_id):
         msg['To'] = recipient_email
         msg['Subject'] = subject
         msg.attach(MIMEText(body, 'plain'))
+
+        if attachments:
+            import os
+            from email.encoders import encode_base64
+            for att in attachments:
+                if os.path.exists(att.get('filepath', '')):
+                    with open(att['filepath'], 'rb') as f:
+                        part = MIMEBase('application', 'octet-stream')
+                        part.set_payload(f.read())
+                        encode_base64(part)
+                        part.add_header('Content-Disposition', f'attachment; filename="{att.get("filename", "attachment")}"')
+                        msg.attach(part)
 
         server = smtplib.SMTP(settings.smtp_server, settings.smtp_port, timeout=30)
         if settings.use_tls:
@@ -695,7 +1093,7 @@ def send_smtp_email(recipient_email, subject, body, user_id):
         import traceback
         return False, f"Error: {str(e)}"
 
-def send_mailjet_email(recipient_email, subject, body, settings):
+def send_mailjet_email(recipient_email, subject, body, settings, attachments=None):
     try:
         api_key = settings.mailjet_api_key
         secret_key = settings.mailjet_secret_key
@@ -704,17 +1102,35 @@ def send_mailjet_email(recipient_email, subject, body, settings):
         import base64
         auth = base64.b64encode(f"{api_key}:{secret_key}".encode()).decode()
 
+        message = {
+            "From": {"Email": from_email, "Name": "Charity CRM"},
+            "To": recipient_email if isinstance(recipient_email, str) else ",".join(recipient_email),
+            "Subject": subject,
+            "TextPart": body,
+            "HTMLPart": body.replace('\n', '<br>')
+        }
+
+        if attachments:
+            import os
+            import base64
+            attachment_list = []
+            for att in attachments:
+                if os.path.exists(att.get('filepath', '')):
+                    with open(att['filepath'], 'rb') as f:
+                        attachment_list.append({
+                            "ContentType": att.get('content_type', 'application/octet-stream'),
+                            "Filename": att.get('filename', 'attachment'),
+                            "Base64Content": base64.b64encode(f.read()).decode()
+                        })
+            if attachment_list:
+                message["Attachments"] = attachment_list
+
         data = json.dumps({
-            "Messages": [{
-                "From": {"Email": from_email, "Name": "Charity CRM"},
-                "To": [{"Email": recipient_email}],
-                "Subject": subject,
-                "TextPart": body
-            }]
+            "Messages": [message]
         }).encode('utf-8')
 
         req = urllib.request.Request(
-            "https://api.mailjet.com/v3.0/send",
+            "https://api.mailjet.com/v3.1/send",
             data=data,
             headers={
                 "Content-Type": "application/json",
@@ -723,10 +1139,10 @@ def send_mailjet_email(recipient_email, subject, body, settings):
             method="POST"
         )
 
-        with urllib.request.urlopen(req, timeout=30) as response:
+        with urllib.request.urlopen(req, timeout=60) as response:
             result = json.loads(response.read().decode())
             if result.get("Messages", [{}])[0].get("Status") == "success":
-                return True, "Sent"
+                return True, "Sent via Mailjet"
             else:
                 return False, f"Mailjet error: {result}"
 
@@ -759,6 +1175,316 @@ def settings():
         return redirect(url_for('settings'))
 
     return render_template('settings.html', smtp=smtp)
+
+
+@app.route('/pipeline')
+@login_required
+def show_pipeline():
+    stages = {
+        'New': Contact.query.filter_by(pipeline_stage='New').all(),
+        'Contacted': Contact.query.filter_by(pipeline_stage='Contacted').all(),
+        'In Progress': Contact.query.filter_by(pipeline_stage='In Progress').all(),
+        'Completed': Contact.query.filter_by(pipeline_stage='Completed').all(),
+        'Lost': Contact.query.filter_by(pipeline_stage='Lost').all()
+    }
+    return render_template('pipeline.html', stages=stages)
+
+
+@app.route('/contact/<int:contact_id>/pipeline', methods=['POST'])
+@login_required
+def set_pipeline_stage(contact_id):
+    contact = Contact.query.get_or_404(contact_id)
+    new_stage = request.form.get('stage', 'New')
+    old_stage = contact.pipeline_stage
+    contact.pipeline_stage = new_stage
+    db.session.commit()
+    log_activity(contact_id, f"Pipeline stage changed from {old_stage} to {new_stage}")
+    flash(f'Stage updated to {new_stage}', 'success')
+    return redirect(url_for('show_pipeline'))
+
+
+@app.route('/tasks')
+@login_required
+def my_tasks():
+    tasks = Task.query.filter_by(assigned_to=current_user.id).order_by(Task.due_date.asc()).all()
+    return render_template('my_tasks.html', tasks=tasks)
+
+
+@app.route('/tasks/new', methods=['GET', 'POST'])
+@login_required
+def create_task():
+    if request.method == 'POST':
+        title = request.form.get('title', '').strip()
+        if not title:
+            flash('Task title is required.', 'error')
+            return redirect(url_for('create_task'))
+
+        task = Task(
+            title=title,
+            description=request.form.get('description', '').strip(),
+            contact_id=request.form.get('contact_id') or None,
+            assigned_to=request.form.get('assigned_to') or current_user.id,
+            due_date=parse_date(request.form.get('due_date', ''))
+        )
+        db.session.add(task)
+        db.session.commit()
+        flash('Task created!', 'success')
+        return redirect(url_for('my_tasks'))
+
+    contacts = Contact.query.all()
+    users = User.query.all()
+    return render_template('task_form.html', task=None, contacts=contacts, users=users)
+
+
+@app.route('/tasks/<int:task_id>/toggle', methods=['POST'])
+@login_required
+def toggle_task(task_id):
+    task = Task.query.get_or_404(task_id)
+    task.completed = not task.completed
+    if task.completed:
+        from datetime import datetime
+        task.completed_at = datetime.utcnow()
+    else:
+        task.completed_at = None
+    db.session.commit()
+    flash(f'Task {"completed" if task.completed else " reopened"}!', 'success')
+    return redirect(url_for('my_tasks'))
+
+
+@app.route('/tasks/<int:task_id>/delete', methods=['POST'])
+@login_required
+def delete_task(task_id):
+    task = Task.query.get_or_404(task_id)
+    db.session.delete(task)
+    db.session.commit()
+    flash('Task deleted.', 'success')
+    return redirect(url_for('my_tasks'))
+
+
+@app.route('/donations')
+@login_required
+def donations_list():
+    filter_status = request.args.get('filter', 'all')
+    if filter_status == 'year':
+        from datetime import date
+        year = date.today().year
+        dons = Donation.query.filter(db.func.strftime('%Y', Donation.donation_date) == str(year)).all()
+    else:
+        dons = Donation.query.order_by(Donation.donation_date.desc()).all()
+
+    total = sum(d.amount for d in dons)
+    return render_template('donations.html', donations=dons, total=total, filter_status=filter_status)
+
+
+@app.route('/contact/<int:contact_id>/donations/add', methods=['GET', 'POST'])
+@login_required
+def add_donation(contact_id):
+    contact = Contact.query.get_or_404(contact_id)
+    if request.method == 'POST':
+        amount = request.form.get('amount', type=float)
+        if not amount or amount <= 0:
+            flash('Valid amount is required.', 'error')
+            return redirect(url_for('add_donation', contact_id=contact_id))
+
+        donation = Donation(
+            contact_id=contact_id,
+            amount=amount,
+            donation_date=parse_date(request.form.get('donation_date', '')),
+            payment_method=request.form.get('payment_method', '').strip(),
+            payment_reference=request.form.get('payment_reference', '').strip(),
+            notes=request.form.get('notes', '').strip()
+        )
+        db.session.add(donation)
+        db.session.commit()
+        log_activity(contact_id, f"Donation of ${amount} recorded")
+        flash(f'Donation of ${amount} recorded!', 'success')
+        return redirect(url_for('contact_detail', contact_id=contact_id))
+
+    return render_template('donation_form.html', contact=contact)
+
+
+@app.route('/donations/<int:donation_id>/delete', methods=['POST'])
+@login_required
+def delete_donation(donation_id):
+    donation = Donation.query.get_or_404(donation_id)
+    contact_id = donation.contact_id
+    db.session.delete(donation)
+    db.session.commit()
+    flash('Donation deleted.', 'success')
+    return redirect(url_for('contact_detail', contact_id=contact_id))
+
+
+@app.route('/events')
+@login_required
+def events_list():
+    upcoming = Event.query.filter(Event.event_date >= datetime.utcnow()).order_by(Event.event_date.asc()).all()
+    past = Event.query.filter(Event.event_date < datetime.utcnow()).order_by(Event.event_date.desc()).all()
+    return render_template('events.html', upcoming=upcoming, past=past)
+
+
+@app.route('/events/new', methods=['GET', 'POST'])
+@login_required
+def create_event():
+    if request.method == 'POST':
+        name = request.form.get('name', '').strip()
+        if not name:
+            flash('Event name is required.', 'error')
+            return redirect(url_for('create_event'))
+
+        event = Event(
+            name=name,
+            description=request.form.get('description', '').strip(),
+            event_date=parse_datetime(request.form.get('event_date', '')),
+            location=request.form.get('location', '').strip(),
+            event_type=request.form.get('event_type', '').strip(),
+            capacity=request.form.get('capacity', type=int) or None
+        )
+        db.session.add(event)
+        db.session.commit()
+        flash('Event created!', 'success')
+        return redirect(url_for('events_list'))
+
+    return render_template('event_form.html', event=None)
+
+
+@app.route('/events/<int:event_id>')
+@login_required
+def event_detail(event_id):
+    event = Event.query.get_or_404(event_id)
+    registrations = EventRegistration.query.filter_by(event_id=event_id).all()
+    contacts = Contact.query.order_by(Contact.last_name.asc()).all()
+    return render_template('event_detail.html', event=event, registrations=registrations, contacts=contacts)
+
+
+@app.route('/events/<int:event_id>/register', methods=['POST'])
+@login_required
+def register_event(event_id):
+    event = Event.query.get_or_404(event_id)
+    contact_id = request.form.get('contact_id', type=int)
+
+    existing = EventRegistration.query.filter_by(event_id=event_id, contact_id=contact_id).first()
+    if existing:
+        flash('Contact already registered.', 'warning')
+        return redirect(url_for('event_detail', event_id=event_id))
+
+    reg = EventRegistration(event_id=event_id, contact_id=contact_id)
+    db.session.add(reg)
+    db.session.commit()
+    log_activity(contact_id, f"Registered for event: {event.name}")
+    flash('Contact registered for event!', 'success')
+    return redirect(url_for('event_detail', event_id=event_id))
+
+
+@app.route('/events/<int:event_id>/unregister', methods=['POST'])
+@login_required
+def unregister_event(event_id):
+    contact_id = request.form.get('contact_id', type=int)
+    reg = EventRegistration.query.filter_by(event_id=event_id, contact_id=contact_id).first()
+    if reg:
+        db.session.delete(reg)
+        db.session.commit()
+        flash('Registration removed.', 'success')
+    return redirect(url_for('event_detail', event_id=event_id))
+
+
+@app.route('/activity')
+@login_required
+def activity_log():
+    filter_type = request.args.get('type', '')
+    page = request.args.get('page', 1, type=int)
+
+    query = ActivityLog.query
+    if filter_type:
+        query = query.filter_by(action=filter_type)
+
+    logs = query.order_by(ActivityLog.created_at.desc()).paginate(page=page, per_page=50, error_out=False)
+    return render_template('activity_log.html', logs=logs, filter_type=filter_type)
+
+
+@app.route('/tags')
+@login_required
+def tags_list():
+    tags = Tag.query.all()
+    return render_template('tags.html', tags=tags)
+
+
+@app.route('/tags/new', methods=['POST'])
+@login_required
+def create_tag():
+    name = request.form.get('name', '').strip()
+    color = request.form.get('color', 'primary')
+    if not name:
+        flash('Tag name is required.', 'error')
+    else:
+        existing = Tag.query.filter_by(name=name).first()
+        if existing:
+            flash(f'Tag {name} already exists.', 'warning')
+        else:
+            tag = Tag(name=name, color=color)
+            db.session.add(tag)
+            db.session.commit()
+            flash(f'Tag {name} created!', 'success')
+    return redirect(url_for('tags_list'))
+
+
+@app.route('/contact/<int:contact_id>/tags', methods=['GET', 'POST'])
+@login_required
+def contact_tags(contact_id):
+    contact = Contact.query.get_or_404(contact_id)
+    if request.method == 'POST':
+        tag_id = request.form.get('tag_id', type=int)
+        existing = ContactTag.query.filter_by(contact_id=contact_id, tag_id=tag_id).first()
+        if not existing:
+            ct = ContactTag(contact_id=contact_id, tag_id=tag_id)
+            db.session.add(ct)
+            db.session.commit()
+            flash('Tag added!', 'success')
+        return redirect(url_for('contact_tags', contact_id=contact_id))
+
+    all_tags = Tag.query.all()
+    contact_tag_ids = [ct.tag_id for ct in ContactTag.query.filter_by(contact_id=contact_id).all()]
+    return render_template('contact_tags.html', contact=contact, all_tags=all_tags, contact_tag_ids=contact_tag_ids)
+
+
+@app.route('/contact/<int:contact_id>/tag/<int:tag_id>/remove', methods=['POST'])
+@login_required
+def remove_contact_tag(contact_id, tag_id):
+    ct = ContactTag.query.filter_by(contact_id=contact_id, tag_id=tag_id).first()
+    if ct:
+        db.session.delete(ct)
+        db.session.commit()
+        flash('Tag removed.', 'success')
+    return redirect(url_for('contact_tags', contact_id=contact_id))
+
+
+def log_activity(contact_id, action, details=None):
+    log = ActivityLog(contact_id=contact_id, user_id=current_user.id, action=action, details=details)
+    db.session.add(log)
+    db.session.commit()
+
+
+def parse_date(date_str):
+    if not date_str:
+        return None
+    from datetime import datetime
+    try:
+        return datetime.strptime(date_str, '%Y-%m-%d').date()
+    except:
+        return None
+
+
+def parse_datetime(dt_str):
+    if not dt_str:
+        return None
+    from datetime import datetime
+    try:
+        return datetime.strptime(dt_str, '%Y-%m-%dT%H:%M')
+    except:
+        try:
+            return datetime.strptime(dt_str, '%Y-%m-%d')
+        except:
+            return None
+
 
 @app.context_processor
 def inject_categories():
