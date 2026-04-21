@@ -886,9 +886,20 @@ def my_tasks():
     return render_template('my_tasks.html', tasks=tasks)
 
 def send_smtp_email(recipient_email, subject, body, user_id):
-    settings = SMTPSettings.query.filter_by(user_id=user_id).first()
+    user_settings = SMTPSettings.query.filter_by(user_id=user_id).first()
+
+    admin_settings = None
+    if current_user.is_admin:
+        admin_settings = user_settings
+    else:
+        admin_user = User.query.filter_by(is_admin=True).first()
+        if admin_user:
+            admin_settings = SMTPSettings.query.filter_by(user_id=admin_user.id).first()
+
+    settings = user_settings or admin_settings
+
     if not settings:
-        return False, "SMTP not configured"
+        return False, "SMTP not configured. Ask admin to set up email in Settings."
 
     if settings.sendgrid_enabled and settings.sendgrid_api_key:
         return send_sendgrid_email(recipient_email, subject, body, settings)
@@ -897,7 +908,7 @@ def send_smtp_email(recipient_email, subject, body, user_id):
         return send_mailgun_email(recipient_email, subject, body, settings)
 
     if not settings.smtp_server:
-        return False, "SMTP not configured"
+        return False, "SMTP not configured. Ask admin to set up email in Settings."
 
     try:
         msg = MIMEMultipart()
