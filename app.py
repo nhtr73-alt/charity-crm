@@ -500,22 +500,6 @@ def send_single_email(contact_id):
 
     return render_template('email_single.html', contact=contact)
 
-        use_smtp = request.form.get('use_smtp') == 'send'
-
-        if use_smtp:
-            ok, msg = send_smtp_email(contact.email, subject, body, current_user.id)
-            if ok:
-                flash(f'Email sent to {contact.email}!', 'success')
-            else:
-                flash(f'Send failed: {msg}. Use mailto instead.', 'error')
-        else:
-            mailto_url = f"mailto:{contact.email}?subject={subject}&body={body}"
-            flash(f'Email ready. <a href="{mailto_url}" class="btn btn-primary">Open Email App</a>', 'success')
-
-        return redirect(url_for('contact_detail', contact_id=contact_id))
-
-    return render_template('email_single.html', contact=contact)
-
 def get_unique_sub_categories():
     sub_categories = set()
     contacts = Contact.query.all()
