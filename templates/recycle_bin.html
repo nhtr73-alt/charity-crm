@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+
+{% block title %}Recycle Bin - True Butterflies Foundation{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Recycle Bin</h1>
+    <p class="text-muted">Deleted contacts can be restored within 30 days.</p>
+</div>
+
+{% if deleted %}
+<div class="card">
+    <div class="card-body">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Email</th>
+                    <th>Category</th>
+                    <th>Deleted</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for d in deleted %}
+                <tr>
+                    <td>{{ d.first_name }} {{ d.last_name }}</td>
+                    <td>{{ d.email }}</td>
+                    <td>{{ d.category }}</td>
+                    <td>{{ d.deleted_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                    <td>
+                        <form method="POST" action="{{ url_for('restore_contact', id=d.id) }}" style="display:inline;">
+                            <button type="submit" class="btn btn-sm btn-outline-success">Restore</button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% else %}
+<div class="alert alert-info">Recycle bin is empty.</div>
+{% endif %}
+{% endblock %}

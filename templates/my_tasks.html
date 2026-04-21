@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+
+{% block title %}My Tasks - True Butterflies Foundation{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>My Tasks</h1>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        {% if tasks %}
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Contact</th>
+                    <th>Task</th>
+                    <th>Due Date</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for task in tasks %}
+                <tr class="{% if task.due_date and task.due_date < datetime.utcnow().date() %}table-danger{% endif %}">
+                    <td>
+                        {% if task.contact_id %}
+                        <a href="{{ url_for('contact_detail', contact_id=task.contact_id) }}">{{ task.contact.first_name }} {{ task.contact.last_name }}</a>
+                        {% else %}
+                        -
+                        {% endif %}
+                    </td>
+                    <td>{{ task.title }}</td>
+                    <td>{{ task.due_date.strftime('%Y-%m-%d') if task.due_date else 'No date' }}</td>
+                    <td>{% if task.completed %}<span class="badge bg-success">Completed</span>{% else %}<span class="badge bg-warning">Pending</span>{% endif %}</td>
+                    <td>
+                        <form method="POST" action="{{ url_for('toggle_task', task_id=task.id) }}" style="display:inline;">
+                            <button type="submit" class="btn btn-sm btn-outline-{% if task.completed %}warning{% else %}success{% endif %}">
+                                {% if task.completed %}Undo{% else %}Complete{% endif %}
+                            </button>
+                        </form>
+                        <form method="POST" action="{{ url_for('delete_task', task_id=task.id) }}" style="display:inline;">
+                            <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('Delete?');">Delete</button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <p class="text-muted">No tasks assigned to you.</p>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

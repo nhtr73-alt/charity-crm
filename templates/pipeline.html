@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+
+{% block title %}Pipeline - True Butterflies Foundation{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Pipeline</h1>
+</div>
+
+<div class="row">
+    {% for stage, contacts in stages.items() %}
+    <div class="col-md">
+        <div class="card mb-3">
+            <div class="card-header bg-{% if stage == 'New' %}primary{% elif stage == 'Contacted' %}info{% elif stage == 'In Progress' %}warning{% elif stage == 'Completed' %}success{% else %}secondary{% endif %} text-white">
+                <h5>{{ stage }} ({{ contacts|length }})</h5>
+            </div>
+            <div class="card-body" style="min-height: 300px;">
+                {% for contact in contacts %}
+                <div class="card mb-2">
+                    <div class="card-body py-2">
+                        <a href="{{ url_for('contact_detail', contact_id=contact.id) }}">{{ contact.full_name }}</a>
+                        <br><small class="text-muted">{{ contact.email }}</small>
+                        <form method="POST" action="{{ url_for('set_pipeline_stage', contact_id=contact.id) }}" class="mt-2">
+                            <select name="stage" class="form-select form-select-sm" onchange="this.form.submit()">
+                                <option value="New" {% if contact.pipeline_stage == 'New' %}selected{% endif %}>New</option>
+                                <option value="Contacted" {% if contact.pipeline_stage == 'Contacted' %}selected{% endif %}>Contacted</option>
+                                <option value="In Progress" {% if contact.pipeline_stage == 'In Progress' %}selected{% endif %}>In Progress</option>
+                                <option value="Completed" {% if contact.pipeline_stage == 'Completed' %}selected{% endif %}>Completed</option>
+                                <option value="Lost" {% if contact.pipeline_stage == 'Lost' %}selected{% endif %}>Lost</option>
+                            </select>
+                        </form>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}

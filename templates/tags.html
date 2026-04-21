@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+
+{% block title %}Tags - True Butterflies Foundation{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Tags</h1>
+</div>
+
+<div class="row">
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h5>Create Tag</h5>
+            </div>
+            <div class="card-body">
+                <form method="POST">
+                    <div class="mb-3">
+                        <label class="form-label">Tag Name</label>
+                        <input type="text" name="name" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Color</label>
+                        <select name="color" class="form-select">
+                            <option value="primary">Blue</option>
+                            <option value="success">Green</option>
+                            <option value="danger">Red</option>
+                            <option value="warning">Yellow</option>
+                            <option value="info">Cyan</option>
+                            <option value="secondary">Gray</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Create Tag</button>
+                </form>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h5>Existing Tags</h5>
+            </div>
+            <div class="card-body">
+                {% if tags %}
+                <div class="d-flex flex-wrap gap-2">
+                    {% for tag in tags %}
+                    <span class="badge bg-{{ tag.color }}">{{ tag.name }}</span>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <p class="text-muted">No tags created yet.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

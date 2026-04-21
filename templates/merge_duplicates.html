@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+
+{% block title %}Merge Duplicates - True Butterflies Foundation{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Merge Duplicates</h1>
+    <p class="text-muted">Contacts with the same email address.</p>
+</div>
+
+{% if duplicates %}
+{% for group in duplicates %}
+<div class="card mb-3">
+    <div class="card-header">
+        <h5>Email: {{ group[0].email }}</h5>
+    </div>
+    <div class="card-body">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Phone</th>
+                    <th>Company</th>
+                    <th>Category</th>
+                    <th>Created</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for contact in group %}
+                <tr>
+                    <td>{{ contact.first_name }} {{ contact.last_name }}</td>
+                    <td>{{ contact.phone or '-' }}</td>
+                    <td>{{ contact.company or '-' }}</td>
+                    <td>{{ contact.category }}</td>
+                    <td>{{ contact.created_at.strftime('%Y-%m-%d') }}</td>
+                    <td>
+                        {% if loop.index0 > 0 %}
+                        <form method="POST" action="{{ url_for('merge_contacts', id=contact.id, target_id=group[0].id) }}" style="display:inline;">
+                            <button type="submit" class="btn btn-sm btn-outline-warning" onclick="return confirm('Merge into {{ group[0].full_name }}?');">
+                                Merge into #1
+                            </button>
+                        </form>
+                        {% else %}
+                        <span class="text-muted">Keep</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endfor %}
+{% else %}
+<div class="alert alert-success">No duplicate contacts found!</div>
+{% endif %}
+{% endblock %}

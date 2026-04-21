@@ -40,6 +40,27 @@
             <a href="{{ url_for('settings') }}" class="{% if request.endpoint == 'settings' %}active{% endif %}">
                 <i class="bi bi-gear"></i> Settings
             </a>
+            <a href="{{ url_for('pipeline') }}" class="{% if request.endpoint == 'pipeline' %}active{% endif %}">
+                <i class="bi bi-kanban"></i> Pipeline
+            </a>
+            <a href="{{ url_for('my_tasks') %}" class="{% if request.endpoint == 'my_tasks' %}active{% endif %}">
+                <i class="bi bi-check2-square"></i> My Tasks
+            </a>
+            <a href="{{ url_for('activity_log') %}" class="{% if request.endpoint == 'activity_log' %}active{% endif %}">
+                <i class="bi bi-activity"></i> Activity
+            </a>
+            <a href="{{ url_for('recycle_bin') %}" class="{% if request.endpoint == 'recycle_bin' %}active{% endif %}">
+                <i class="bi bi-trash"></i> Recycle Bin
+            </a>
+            <a href="{{ url_for('manage_tags') %}" class="{% if request.endpoint == 'manage_tags' %}active{% endif %}">
+                <i class="bi bi-tag"></i> Tags
+            </a>
+            <a href="{{ url_for('email_templates') %}" class="{% if request.endpoint == 'email_templates' %}active{% endif %}">
+                <i class="bi bi-file-text"></i> Email Templates
+            </a>
+            <a href="{{ url_for('merge_duplicates') }}" class="{% if request.endpoint == 'merge_duplicates' %}active{% endif %}">
+                <i class="bi bi-union"></i> Merge Duplicates
+            </a>
         </nav>
     </div>
 

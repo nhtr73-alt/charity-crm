@@ -48,6 +48,7 @@
                         <th>Company</th>
                         <th>Category</th>
                         <th>Sub-Category</th>
+                        <th>Stage</th>
                         <th>Actions</th>
                     </tr>
                 </thead>
@@ -62,12 +63,15 @@
                         <td>{{ contact.company or '-' }}</td>
                         <td><span class="badge bg-primary">{{ contact.category }}</span></td>
                         <td>{{ contact.sub_category or '-' }}</td>
+                        <td><span class="badge bg-{% if contact.pipeline_stage == 'Completed' %}success{% elif contact.pipeline_stage == 'In Progress' %}warning{% else %}secondary{% endif %}">{{ contact.pipeline_stage or 'New' }}</span></td>
                         <td>
                             <div class="action-buttons">
                                 <a href="{{ url_for('contact_detail', contact_id=contact.id) }}" class="btn btn-sm btn-outline-primary"
                                     title="View"><i class="bi bi-eye"></i></a>
                                 <a href="{{ url_for('contact_edit', contact_id=contact.id) }}" class="btn btn-sm btn-outline-secondary"
                                     title="Edit"><i class="bi bi-pencil"></i></a>
+                                <a href="{{ url_for('contact_tasks', contact_id=contact.id) }}" class="btn btn-sm btn-outline-warning"
+                                    title="Tasks"><i class="bi bi-check2-square"></i></a>
                                 <a href="{{ url_for('send_single_email', contact_id=contact.id) }}" class="btn btn-sm btn-outline-info"
                                     title="Email"><i class="bi bi-envelope"></i></a>
                             </div>
@@ -87,6 +91,13 @@
                 <i class="bi bi-download"></i> Export CSV
             </a>
         </div>
+    </form>
+
+    <form method="POST" action="{{ url_for('bulk_delete') }}" id="bulkDeleteForm">
+        <input type="hidden" name="contact_ids" id="bulkDeleteIds">
+        <button type="button" class="btn btn-danger" onclick="submitBulkDelete()">
+            <i class="bi bi-trash"></i> Delete Selected
+        </button>
     </form>
 
     <nav>
@@ -116,5 +127,17 @@
 document.getElementById('select-all').addEventListener('change', function() {
     document.querySelectorAll('input[name="contacts"]').forEach(cb => cb.checked = this.checked);
 });
+
+function submitBulkDelete() {
+    const selected = Array.from(document.querySelectorAll('input[name="contacts"]:checked')).map(cb => cb.value);
+    if (selected.length === 0) {
+        alert('Please select contacts to delete');
+        return;
+    }
+    if (confirm('Delete ' + selected.length + ' contact(s)? They will go to recycle bin.')) {
+        document.getElementById('bulkDeleteIds').value = selected.join(',');
+        document.getElementById('bulkDeleteForm').submit();
+    }
+}
 </script>
 {% endblock %}
