@@ -1,1 +1,1 @@
-web: python -c "from app import app; app.run(host='0.0.0.0', port=int(getenv('PORT', 5000)))"
+web: flask run --host=0.0.0.0
