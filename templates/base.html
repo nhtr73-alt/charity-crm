@@ -43,6 +43,9 @@
 
     <div class="main-content">
         <header>
+            <a href="{{ url_for('index') }}" class="btn btn-outline-secondary btn-sm">
+                <i class="bi bi-arrow-left"></i> Back to Dashboard
+            </a>
             <form action="{{ url_for('contacts_list') }}" method="GET" class="search-form">
                 <div class="input-group">
                     <input type="text" name="search" class="form-control" placeholder="Search contacts..." value="{{ request.args.get('search', '') }}">
