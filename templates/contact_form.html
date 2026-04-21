@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+
+{% block title %}{% if contact %}Edit Contact{% else %}Add Contact{% endif %} - Charity CRM{% endblock %}
+
+{% block content %}
+<div class="form-page">
+    <h1>{% if contact %}Edit Contact{% else %}Add Contact{% endif %}</h1>
+
+    <form method="POST" class="contact-form">
+        <div class="row">
+            <div class="col-md-6">
+                <div class="mb-3">
+                    <label for="first_name" class="form-label">First Name *</label>
+                    <input type="text" class="form-control" id="first_name" name="first_name"
+                           value="{{ contact.first_name or '' }}" required>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="mb-3">
+                    <label for="last_name" class="form-label">Last Name *</label>
+                    <input type="text" class="form-control" id="last_name" name="last_name"
+                           value="{{ contact.last_name or '' }}" required>
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-md-6">
+                <div class="mb-3">
+                    <label for="email" class="form-label">Email *</label>
+                    <input type="email" class="form-control" id="email" name="email"
+                           value="{{ contact.email or '' }}" required>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="mb-3">
+                    <label for="phone" class="form-label">Phone</label>
+                    <input type="text" class="form-control" id="phone" name="phone"
+                           value="{{ contact.phone or '' }}">
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-md-6">
+                <div class="mb-3">
+                    <label for="company" class="form-label">Company</label>
+                    <input type="text" class="form-control" id="company" name="company"
+                           value="{{ contact.company or '' }}">
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="mb-3">
+                    <label for="category" class="form-label">Category</label>
+                    <select class="form-select" id="category" name="category">
+                        {% for cat in categories %}
+                        <option value="{{ cat }}" {% if contact.category == cat %}selected{% endif %}>{{ cat }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-md-6">
+                <div class="mb-3">
+                    <label for="sub_category" class="form-label">Sub-Category</label>
+                    <input type="text" class="form-control" id="sub_category" name="sub_category"
+                           value="{{ contact.sub_category or '' }}" list="sub_categories">
+                    <datalist id="sub_categories">
+                        {% for sub in sub_categories %}
+                        <option value="{{ sub }}">
+                        {% endfor %}
+                    </datalist>
+                </div>
+            </div>
+        </div>
+
+        <div class="mb-3">
+            <label for="notes" class="form-label">Notes</label>
+            <textarea class="form-control" id="notes" name="notes" rows="4">{{ contact.notes or '' }}</textarea>
+        </div>
+
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary">
+                <i class="bi bi-check-lg"></i> {% if contact %}Update{% else %}Add{% endif %} Contact
+            </button>
+            <a href="{{ url_for('contacts_list') }}" class="btn btn-outline-secondary">Cancel</a>
+        </div>
+    </form>
+</div>
+{% endblock %}

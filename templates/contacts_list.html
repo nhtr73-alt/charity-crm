@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+
+{% block title %}Contacts - Charity CRM{% endblock %}
+
+{% block content %}
+<div class="contacts-page">
+    <div class="page-header">
+        <h1>Contacts</h1>
+        <div class="header-actions">
+            <a href="{{ url_for('contact_add') }}" class="btn btn-primary">
+                <i class="bi bi-plus-lg"></i> Add Contact
+            </a>
+        </div>
+    </div>
+
+    <div class="filters">
+        <form method="GET" class="filter-form">
+            <select name="category" class="form-select">
+                <option value="">All Categories</option>
+                {% for cat in categories_list %}
+                <option value="{{ cat }}" {% if category_filter == cat %}selected{% endif %}>{{ cat }}</option>
+                {% endfor %}
+            </select>
+            <select name="sub_category" class="form-select">
+                <option value="">All Sub-Categories</option>
+                {% for sub_cat in sub_categories %}
+                <option value="{{ sub_cat }}" {% if sub_category_filter == sub_cat %}selected{% endif %}>{{ sub_cat }}</option>
+                {% endfor %}
+            </select>
+            <select name="sort" class="form-select">
+                <option value="name" {% if sort == 'name' %}selected{% endif %}>Sort by Name</option>
+                <option value="date" {% if sort == 'date' %}selected{% endif %}>Sort by Date</option>
+            </select>
+            <button type="submit" class="btn btn-outline-secondary">Filter</button>
+        </form>
+    </div>
+
+    {% if contacts.items %}
+    <form method="POST" action="{{ url_for('email_page') }}">
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th><input type="checkbox" id="select-all"></th>
+                        <th>Name</th>
+                        <th>Email</th>
+                        <th>Phone</th>
+                        <th>Company</th>
+                        <th>Category</th>
+                        <th>Sub-Category</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for contact in contacts.items %}
+                    <tr>
+                        <td><input type="checkbox" name="contacts" value="{{ contact.id }}" {% if
+                            request.args.get('contact_' + contact.id|string) %}checked{% endif %}></td>
+                        <td><a href="{{ url_for('contact_detail', contact_id=contact.id) }}">{{ contact.first_name }} {{ contact.last_name }}</a></td>
+                        <td>{{ contact.email }}</td>
+                        <td>{{ contact.phone or '-' }}</td>
+                        <td>{{ contact.company or '-' }}</td>
+                        <td><span class="badge bg-primary">{{ contact.category }}</span></td>
+                        <td>{{ contact.sub_category or '-' }}</td>
+                        <td>
+                            <div class="action-buttons">
+                                <a href="{{ url_for('contact_detail', contact_id=contact.id) }}" class="btn btn-sm btn-outline-primary"
+                                    title="View"><i class="bi bi-eye"></i></a>
+                                <a href="{{ url_for('contact_edit', contact_id=contact.id) }}" class="btn btn-sm btn-outline-secondary"
+                                    title="Edit"><i class="bi bi-pencil"></i></a>
+                                <a href="{{ url_for('send_single_email', contact_id=contact.id) }}" class="btn btn-sm btn-outline-info"
+                                    title="Email"><i class="bi bi-envelope"></i></a>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <div class="bulk-actions">
+            <button type="submit" class="btn btn-primary">
+                <i class="bi bi-envelope"></i> Send Email to Selected
+            </button>
+            <a href="{{ url_for('contacts_list', **dict(category=category_filter, sub_category=sub_category_filter, sort=sort, export='csv')) }}"
+                class="btn btn-outline-secondary">
+                <i class="bi bi-download"></i> Export CSV
+            </a>
+        </div>
+    </form>
+
+    <nav>
+        <ul class="pagination">
+            {% if contacts.has_prev %}
+            <li class="page-item"><a class="page-link" href="{{ url_for('contacts_list',
+                page=contacts.prev_num, search=search, category=category_filter,
+                sub_category=sub_category_filter, sort=sort) }}">Previous</a></li>
+            {% endif %}
+            <li class="page-item"><span class="page-link">Page {{ contacts.page }} of {{ contacts.pages }}</span></li>
+            {% if contacts.has_next %}
+            <li class="page-item"><a class="page-link" href="{{ url_for('contacts_list',
+                page=contacts.next_num, search=search, category=category_filter,
+                sub_category=sub_category_filter, sort=sort) }}">Next</a></li>
+            {% endif %}
+        </ul>
+    </nav>
+    {% else %}
+    <div class="empty-state">
+        <p>No contacts found. <a href="{{ url_for('contact_add') }}">Add your first contact</a> or <a
+                href="{{ url_for('upload_csv') }}">upload a CSV</a>.</p>
+    </div>
+    {% endif %}
+</div>
+
+<script>
+document.getElementById('select-all').addEventListener('change', function() {
+    document.querySelectorAll('input[name="contacts"]').forEach(cb => cb.checked = this.checked);
+});
+</script>
+{% endblock %}

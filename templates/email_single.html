@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+
+{% block title %}Send Email - Charity CRM{% endblock %}
+
+{% block content %}
+<div class="email-page">
+    <h1>Send Email to {{ contact.full_name }}</h1>
+
+    <div class="card">
+        <div class="card-body">
+            <p><strong>To:</strong> <a href="mailto:{{ contact.email }}">{{ contact.email }}</a></p>
+
+            <form method="POST">
+                <div class="mb-3">
+                    <label for="subject" class="form-label">Subject</label>
+                    <input type="text" class="form-control" id="subject" name="subject" required>
+                </div>
+                <div class="mb-3">
+                    <label for="body" class="form-label">Message</label>
+                    <textarea class="form-control" id="body" name="body" rows="6" required></textarea>
+                </div>
+                <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-envelope"></i> Prepare Email
+                </button>
+                <a href="{{ url_for('contact_detail', contact_id=contact.id) }}" class="btn btn-outline-secondary">Cancel</a>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

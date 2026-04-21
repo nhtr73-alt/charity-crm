@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+
+{% block title %}Email - Charity CRM{% endblock %}
+
+{% block content %}
+<div class="email-page">
+    <h1>Send Email</h1>
+
+    {% if session.get('bulk_emails') or session.get('single_email') %}
+    <div class="alert alert-info">
+        <strong>Email Prepared!</strong><br>
+        Subject: {{ session.get('email_subject') }}<br>
+        {% if session.get('bulk_emails') %}
+        Recipients: {{ session.get('bulk_emails')|join(', ') }}
+        {% else %}
+        Recipient: {{ session.get('single_email') }}
+        {% endif %}
+        <br><br>
+        <a href="mailto:?subject={{ session.get('email_subject') }}&body={{ session.get('email_body')|urlencode }}"
+           class="btn btn-primary">Open in Email Client</a>
+    </div>
+    {% endif %}
+
+    <div class="card">
+        <div class="card-header">
+            <h5>Select Recipients</h5>
+        </div>
+        <div class="card-body">
+            <form method="GET" class="mb-4">
+                <div class="row">
+                    <div class="col-md-4">
+                        <select name="category" class="form-select">
+                            <option value="">All Categories</option>
+                            {% for cat in categories_list %}
+                            <option value="{{ cat }}" {% if category_filter == cat %}selected{% endif %}>{{ cat }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <button type="submit" class="btn btn-outline-primary">Filter</button>
+                    </div>
+                </div>
+            </form>
+
+            {% if all_contacts %}
+            <form method="POST">
+                <div class="table-responsive" style="max-height: 300px; overflow-y: auto;">
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th><input type="checkbox" id="select-all"></th>
+                                <th>Name</th>
+                                <th>Email</th>
+                                <th>Category</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for contact in all_contacts %}
+                            <tr>
+                                <td><input type="checkbox" name="recipients" value="{{ contact.id }}" {% if contact.id in selected_ids %}checked{% endif %}></td>
+                                <td>{{ contact.first_name }} {{ contact.last_name }}</td>
+                                <td>{{ contact.email }}</td>
+                                <td>{{ contact.category }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="mt-4">
+                    <h5>Email Content</h5>
+                    <div class="mb-3">
+                        <label for="subject" class="form-label">Subject</label>
+                        <input type="text" class="form-control" id="subject" name="subject" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="body" class="form-label">Message</label>
+                        <textarea class="form-control" id="body" name="body" rows="6" required></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-envelope"></i> Prepare Email
+                    </button>
+                </div>
+            </form>
+            {% else %}
+            <p class="text-muted">No contacts found. <a href="{{ url_for('contacts_list') }}">Add contacts</a> first.</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<script>
+document.getElementById('select-all').addEventListener('change', function() {
+    document.querySelectorAll('input[name="recipients"]').forEach(cb => cb.checked = this.checked);
+});
+</script>
+{% endblock %}

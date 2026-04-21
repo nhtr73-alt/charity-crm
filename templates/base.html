@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Charity CRM{% endblock %}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="sidebar">
+        <div class="brand">Charity CRM</div>
+        <nav>
+            <a href="{{ url_for('index') }}" class="{% if request.endpoint == 'index' %}active{% endif %}">
+                <i class="bi bi-house"></i> Dashboard
+            </a>
+            {% if current_user.is_admin %}
+            <a href="{{ url_for('users') }}" class="{% if request.endpoint == 'users' %}active{% endif %}">
+                <i class="bi bi-person-badge"></i> Users
+            </a>
+            {% endif %}
+            <a href="{{ url_for('contacts_list') }}" class="{% if request.endpoint == 'contacts_list' %}active{% endif %}">
+                <i class="bi bi-people"></i> Contacts
+            </a>
+            <a href="{{ url_for('contact_add') }}" class="{% if request.endpoint == 'contact_add' %}active{% endif %}">
+                <i class="bi bi-person-plus"></i> Add Contact
+            </a>
+            <a href="{{ url_for('upload_csv') }}" class="{% if request.endpoint == 'upload_csv' %}active{% endif %}">
+                <i class="bi bi-upload"></i> CSV Upload
+            </a>
+            <a href="{{ url_for('categories') }}" class="{% if request.endpoint == 'categories' %}active{% endif %}">
+                <i class="bi bi-tags"></i> Categories
+            </a>
+            <a href="{{ url_for('email_page') }}" class="{% if request.endpoint == 'email_page' %}active{% endif %}">
+                <i class="bi bi-envelope"></i> Email
+            </a>
+        </nav>
+    </div>
+
+    <div class="main-content">
+        <header>
+            <form action="{{ url_for('contacts_list') }}" method="GET" class="search-form">
+                <div class="input-group">
+                    <input type="text" name="search" class="form-control" placeholder="Search contacts..." value="{{ request.args.get('search', '') }}">
+                    <button type="submit" class="btn btn-outline-secondary">
+                        <i class="bi bi-search"></i>
+                    </button>
+                </div>
+            </form>
+            <div class="user-info">
+                <span>{{ current_user.username }}</span>
+                <a href="{{ url_for('logout') }}" class="btn btn-sm btn-outline-danger">Logout</a>
+            </div>
+        </header>
+
+        <main>
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        <div class="alert alert-{{ 'danger' if category == 'error' else 'success' if category == 'success' else 'warning' if category == 'warning' else 'info' }} alert-dismissible fade show" role="alert">
+                            {{ message }}
+                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+
+            {% block content %}{% endblock %}
+        </main>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

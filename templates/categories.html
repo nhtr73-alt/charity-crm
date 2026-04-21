@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+
+{% block title %}Categories - Charity CRM{% endblock %}
+
+{% block content %}
+<div class="categories-page">
+    <h1>Categories</h1>
+
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5>Main Categories</h5>
+                </div>
+                <div class="card-body">
+                    <ul class="category-list">
+                        {% for category in categories %}
+                        <li>
+                            <span class="badge bg-primary">{{ category }}</span>
+                            <span class="count">({{ category_counts.get(category, 0) }})</span>
+                        </li>
+                        {% endfor %}
+                    </ul>
+
+                    <form method="POST" class="mt-4">
+                        <div class="input-group">
+                            <input type="text" name="new_category" class="form-control" placeholder="Add new category">
+                            <button type="submit" class="btn btn-outline-primary">Add</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5>Sub-Categories</h5>
+                </div>
+                <div class="card-body">
+                    {% if sub_categories %}
+                    <ul class="category-list">
+                        {% for sub_cat in sub_categories %}
+                        <li>{{ sub_cat }}</li>
+                        {% endfor %}
+                    </ul>
+                    {% else %}
+                    <p class="text-muted">No sub-categories yet. Add a contact with a sub-category to create one.</p>
+                    {% endif %}
+
+                    <form method="POST" class="mt-4">
+                        <div class="input-group">
+                            <input type="text" name="new_sub_category" class="form-control" placeholder="Add new sub-category">
+                            <button type="submit" class="btn btn-outline-primary">Add</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

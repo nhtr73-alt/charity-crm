@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - Charity CRM{% endblock %}
+
+{% block content %}
+<div class="dashboard">
+    <h1>Dashboard</h1>
+
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-icon"><i class="bi bi-people"></i></div>
+            <div class="stat-value">{{ total_contacts }}</div>
+            <div class="stat-label">Total Contacts</div>
+        </div>
+
+        {% for category, count in category_counts.items() %}
+        <div class="stat-card">
+            <div class="stat-icon"><i class="bi bi-tag"></i></div>
+            <div class="stat-value">{{ count }}</div>
+            <div class="stat-label">{{ category }}</div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <div class="quick-actions">
+        <h2>Quick Actions</h2>
+        <div class="action-buttons">
+            <a href="{{ url_for('contact_add') }}" class="btn btn-primary">
+                <i class="bi bi-person-plus"></i> Add Contact
+            </a>
+            <a href="{{ url_for('upload_csv') }}" class="btn btn-outline-primary">
+                <i class="bi bi-upload"></i> Import CSV
+            </a>
+            <a href="{{ url_for('contacts_list') }}" class="btn btn-outline-primary">
+                <i class="bi bi-list"></i> View All Contacts
+            </a>
+            <a href="{{ url_for('email_page') }}" class="btn btn-outline-primary">
+                <i class="bi bi-envelope"></i> Send Bulk Email
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+
+{% block title %}CSV Upload - Charity CRM{% endblock %}
+
+{% block content %}
+<div class="upload-page">
+    <h1>Import Contacts from CSV</h1>
+
+    <div class="card">
+        <div class="card-body">
+            <h5>CSV Format</h5>
+            <p>Your CSV file should have the following columns:</p>
+            <pre class="bg-light p-3">first_name,last_name,email,phone,company,category,sub_category</pre>
+
+            <h5>Example:</h5>
+            <pre class="bg-light p-3">first_name,last_name,email,phone,company,category,sub_category
+John,Doe,john@trader.com,01234 567890,Doe Trading,Trader,Food
+Jane,Smith,jane@supplier.com,09876 543210,Smith Co,Supplier,Equipment</pre>
+
+            <form method="POST" enctype="multipart/form-data" class="mt-4">
+                <div class="mb-3">
+                    <label for="file" class="form-label">Select CSV File</label>
+                    <input type="file" class="form-control" id="file" name="file" accept=".csv" required>
+                </div>
+                <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-upload"></i> Import Contacts
+                </button>
+                <a href="{{ url_for('contacts_list') }}" class="btn btn-outline-secondary">Cancel</a>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
