@@ -477,31 +477,34 @@ def get_unique_sub_categories():
     return sorted(list(sub_categories))
 
 def send_smtp_email(recipient_email, subject, body, user_id):
-    settings = SMTPSettings.query.filter_by(user_id=user_id).first()
-
-    admin_user = User.query.filter_by(is_admin=True).first()
-    if not settings and admin_user:
-        settings = SMTPSettings.query.filter_by(user_id=admin_user.id).first()
-
-    if not settings or not settings.smtp_server:
-        return False, "SMTP not configured"
-
+    settings = None
     try:
+        settings = SMTPSettings.query.filter_by(user_id=user_id).first()
+
+        admin_user = User.query.filter_by(is_admin=True).first()
+        if not settings and admin_user:
+            settings = SMTPSettings.query.filter_by(user_id=admin_user.id).first()
+
+        if not settings or not settings.smtp_server:
+            return False, "SMTP not configured - go to Settings"
+
         msg = MIMEMultipart()
-        msg['From'] = settings.smtp_from_email or settings.smtp_username
+        from_addr = settings.smtp_from_email or settings.smtp_username
+        msg['From'] = from_addr
         msg['To'] = recipient_email
         msg['Subject'] = subject
         msg.attach(MIMEText(body, 'plain'))
 
-        server = smtplib.SMTP(settings.smtp_server, settings.smtp_port)
+        server = smtplib.SMTP(settings.smtp_server, settings.smtp_port, timeout=30)
         if settings.use_tls:
             server.starttls()
         server.login(settings.smtp_username, settings.smtp_password)
-        server.sendmail(settings.smtp_from_email or settings.smtp_username, recipient_email, msg.as_string())
+        server.sendmail(from_addr, recipient_email, msg.as_string())
         server.quit()
         return True, "Sent"
     except Exception as e:
-        return False, str(e)
+        import traceback
+        return False, f"Error: {str(e)}"
 
 @app.route('/settings', methods=['GET', 'POST'])
 @login_required
