@@ -7,17 +7,43 @@
     <h1>Email Settings</h1>
     <p><a href="{{ url_for('change_password') }}" class="btn btn-outline-secondary">Change Password</a></p>
 
-    <div class="alert alert-success">
-        <strong>Mailjet:</strong> 6,000 free emails/month, no credit card required!
-        <br>SMTP: in-v3.mailjet.com | Port: 587 | TLS: enabled
+    <div class="alert alert-info">
+        <strong>Mailjet:</strong> 6,000 free emails/month. SMTP: in-v3.mailjet.com | Port: 587
     </div>
 
     <div class="card mb-4">
         <div class="card-header bg-success text-white">
-            <h5>Mailjet (Recommended - 6,000 free emails/month)</h5>
+            <h5>Send Emails</h5>
         </div>
         <div class="card-body">
             <form method="POST">
+                {% if current_user.is_admin %}
+                <div class="alert alert-warning">
+                    <strong>Admin Mode:</strong> These settings apply to ALL users. Configure Mailjet here once.
+                </div>
+                {% else %}
+                <div class="alert alert-info">
+                    <strong>User Mode:</strong> Use your own email OR use shared admin email settings.
+                </div>
+                {% endif %}
+
+                <div class="mb-3 form-check">
+                    <input type="checkbox" class="form-check-input" id="use_shared" name="use_shared" value="1" {% if smtp.use_shared != False %}checked{% endif %}>
+                    <label class="form-check-label" for="use_shared">
+                        {% if current_user.is_admin %}Use these settings for everyone{% else %}Use shared admin email settings{% endif %}
+                    </label>
+                </div>
+
+                <div class="mb-3">
+                    <label for="smtp_from_email" class="form-label">
+                        {% if current_user.is_admin %}From Email (for all users){% else %}Your From Email (optional - must be verified in Mailjet){% endif %}
+                    </label>
+                    <input type="email" class="form-control" id="smtp_from_email" name="smtp_from_email" value="{{ smtp.smtp_from_email or '' }}" placeholder="your@email.com">
+                    {% if not current_user.is_admin %}<small class="text-muted">Leave empty to use shared admin email</small>{% endif %}
+                </div>
+
+                {% if current_user.is_admin %}
+                <hr>
                 <div class="row">
                     <div class="col-md-6">
                         <div class="mb-3">
@@ -35,79 +61,24 @@
                 <div class="row">
                     <div class="col-md-6">
                         <div class="mb-3">
-                            <label for="smtp_username" class="form-label">API Key (as username)</label>
-                            <input type="text" class="form-control" id="smtp_username" name="smtp_username" value="{{ smtp.smtp_username or '' }}">
-                            <small class="text-muted">Found in Mailjet → Account → API Keys</small>
-                        </div>
-                    </div>
-                    <div class="col-md-6">
-                        <div class="mb-3">
-                            <label for="smtp_password" class="form-label">API Secret (as password)</label>
-                            <input type="password" class="form-control" id="smtp_password" name="smtp_password" value="{{ smtp.smtp_password or '' }}">
-                        </div>
-                    </div>
-                </div>
-                <div class="mb-3">
-                    <label for="smtp_from_email" class="form-label">From Email</label>
-                    <input type="email" class="form-control" id="smtp_from_email" name="smtp_from_email" value="{{ smtp.smtp_from_email or '' }}">
-                </div>
-                <div class="mb-3 form-check">
-                    <input type="checkbox" class="form-check-input" id="use_tls" name="use_tls" value="1" {% if smtp.use_tls != False %}checked{% endif %}>
-                    <label class="form-check-label" for="use_tls">Use TLS (recommended)</label>
-                </div>
-                <button type="submit" class="btn btn-success">Save Mailjet Settings</button>
-            </form>
-        </div>
-    </div>
-
-    <div class="card">
-        <div class="card-header">
-            <h5>Other SMTP Providers</h5>
-        </div>
-        <div class="card-body">
-            <form method="POST">
-                <div class="alert alert-info">
-                    <strong>Gmail:</strong> smtp.gmail.com, port 587 (need App Password)<br>
-                    <strong>Outlook:</strong> smtp.office365.com, port 587<br>
-                    <strong>Yahoo:</strong> smtp.mail.yahoo.com, port 587
-                </div>
-                <div class="row">
-                    <div class="col-md-6">
-                        <div class="mb-3">
-                            <label for="smtp_server" class="form-label">SMTP Server</label>
-                            <input type="text" class="form-control" id="smtp_server" name="smtp_server" value="{{ smtp.smtp_server or '' }}">
-                        </div>
-                    </div>
-                    <div class="col-md-6">
-                        <div class="mb-3">
-                            <label for="smtp_port" class="form-label">Port</label>
-                            <input type="number" class="form-control" id="smtp_port" name="smtp_port" value="{{ smtp.smtp_port or 587 }}">
-                        </div>
-                    </div>
-                </div>
-                <div class="row">
-                    <div class="col-md-6">
-                        <div class="mb-3">
-                            <label for="smtp_username" class="form-label">Username</label>
+                            <label for="smtp_username" class="form-label">API Key (username)</label>
                             <input type="text" class="form-control" id="smtp_username" name="smtp_username" value="{{ smtp.smtp_username or '' }}">
                         </div>
                     </div>
                     <div class="col-md-6">
                         <div class="mb-3">
-                            <label for="smtp_password" class="form-label">Password</label>
+                            <label for="smtp_password" class="form-label">API Secret (password)</label>
                             <input type="password" class="form-control" id="smtp_password" name="smtp_password" value="{{ smtp.smtp_password or '' }}">
                         </div>
                     </div>
-                </div>
-                <div class="mb-3">
-                    <label for="smtp_from_email" class="form-label">From Email</label>
-                    <input type="email" class="form-control" id="smtp_from_email" name="smtp_from_email" value="{{ smtp.smtp_from_email or '' }}">
                 </div>
                 <div class="mb-3 form-check">
                     <input type="checkbox" class="form-check-input" id="use_tls" name="use_tls" value="1" {% if smtp.use_tls != False %}checked{% endif %}>
                     <label class="form-check-label" for="use_tls">Use TLS</label>
                 </div>
-                <button type="submit" class="btn btn-primary">Save Settings</button>
+                {% endif %}
+
+                <button type="submit" class="btn btn-success">Save Settings</button>
             </form>
         </div>
     </div>

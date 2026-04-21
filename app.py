@@ -43,6 +43,7 @@ class SMTPSettings(db.Model):
     mailgun_enabled = db.Column(db.Boolean, default=False)
     sendgrid_api_key = db.Column(db.String(255))
     sendgrid_enabled = db.Column(db.Boolean, default=False)
+    use_shared = db.Column(db.Boolean, default=True)
 
 class Document(db.Model):
     __tablename__ = 'documents'
@@ -911,8 +912,14 @@ def send_smtp_email(recipient_email, subject, body, user_id):
         return False, "SMTP not configured. Ask admin to set up email in Settings."
 
     try:
+        from_email = settings.smtp_from_email or settings.smtp_username
+
+        user_settings = SMTPSettings.query.filter_by(user_id=user_id).first()
+        if user_settings and user_settings.smtp_from_email and not user_settings.use_shared:
+            from_email = user_settings.smtp_from_email
+
         msg = MIMEMultipart()
-        msg['From'] = settings.smtp_from_email or settings.smtp_username
+        msg['From'] = from_email
         msg['To'] = recipient_email
         msg['Subject'] = subject
         msg.attach(MIMEText(body, 'plain'))
@@ -921,7 +928,7 @@ def send_smtp_email(recipient_email, subject, body, user_id):
         if settings.use_tls:
             server.starttls()
         server.login(settings.smtp_username, settings.smtp_password)
-        server.sendmail(settings.smtp_from_email or settings.smtp_username, recipient_email, msg.as_string())
+        server.sendmail(from_email, recipient_email, msg.as_string())
         server.quit()
         return True, "Sent"
     except Exception as e:
@@ -1050,6 +1057,7 @@ def settings():
         smtp.smtp_password = request.form.get('smtp_password', '').strip()
         smtp.smtp_from_email = request.form.get('smtp_from_email', '').strip()
         smtp.use_tls = 'use_tls' in request.form
+        smtp.use_shared = 'use_shared' in request.form
         db.session.commit()
         flash('SMTP settings saved!', 'success')
         return redirect(url_for('settings'))
