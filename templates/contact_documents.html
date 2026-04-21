@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+
+{% block title %}Documents - {{ contact.full_name }} - True Butterflies Foundation{% endblock %}
+
+{% block content %}
+<div class="contact-detail">
+    <div class="page-header">
+        <h1>Documents for {{ contact.full_name }}</h1>
+        <div class="header-actions">
+            <a href="{{ url_for('contact_detail', contact_id=contact.id) }}" class="btn btn-outline-secondary">
+                <i class="bi bi-arrow-left"></i> Back to Contact
+            </a>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5>Upload Document</h5>
+                </div>
+                <div class="card-body">
+                    <form method="POST" enctype="multipart/form-data">
+                        <div class="mb-3">
+                            <label for="file" class="form-label">Select File</label>
+                            <input type="file" class="form-control" id="file" name="file" required>
+                            <small class="text-muted">PDF, DOC, DOCX, XLS, XLSX, PNG, JPG</small>
+                        </div>
+                        <div class="mb-3">
+                            <label for="document_type" class="form-label">Document Type</label>
+                            <select class="form-select" id="document_type" name="document_type">
+                                <option value="Booking Form">Booking Form</option>
+                                <option value="Invoice">Invoice</option>
+                                <option value="Receipt">Receipt</option>
+                                <option value="ID">ID / Passport</option>
+                                <option value="Other">Other</option>
+                            </select>
+                        </div>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-upload"></i> Upload
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <h5>Uploaded Documents</h5>
+                </div>
+                <div class="card-body">
+                    {% if documents %}
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Type</th>
+                                <th>Filename</th>
+                                <th>Uploaded</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for doc in documents %}
+                            <tr>
+                                <td><span class="badge bg-info">{{ doc.document_type }}</span></td>
+                                <td>{{ doc.original_filename }}</td>
+                                <td>{{ doc.uploaded_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                                <td>
+                                    <a href="{{ url_for('download_file', filename=doc.filename) }}" class="btn btn-sm btn-outline-primary" download>
+                                        <i class="bi bi-download"></i>
+                                    </a>
+                                    <form method="POST" action="{{ url_for('delete_document', contact_id=contact.id, doc_id=doc.id) }}" style="display:inline;">
+                                        <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('Delete this document?');">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </form>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                    {% else %}
+                    <p class="text-muted">No documents uploaded yet.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

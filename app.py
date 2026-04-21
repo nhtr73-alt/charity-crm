@@ -1,7 +1,8 @@
 import os
-from flask import Flask, render_template, request, redirect, url_for, flash, session
+from flask import Flask, render_template, request, redirect, url_for, flash, session, send_from_directory
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
+from werkzeug.utils import secure_filename
 from datetime import datetime
 import csv
 import io
@@ -9,6 +10,12 @@ import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from models import db, Contact, ContactNote, Category
+
+UPLOAD_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'uploads')
+ALLOWED_EXTENSIONS = {'pdf', 'doc', 'docx', 'xls', 'xlsx', 'png', 'jpg', 'jpeg'}
+
+if not os.path.exists(UPLOAD_FOLDER):
+    os.makedirs(UPLOAD_FOLDER)
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'charity-crm-secret-key-2024')
@@ -42,6 +49,16 @@ class SMTPSettings(db.Model):
     smtp_password = db.Column(db.String(255))
     smtp_from_email = db.Column(db.String(255))
     use_tls = db.Column(db.Boolean, default=True)
+
+class Document(db.Model):
+    __tablename__ = 'documents'
+    id = db.Column(db.Integer, primary_key=True)
+    contact_id = db.Column(db.Integer, db.ForeignKey('contacts.id'), nullable=False)
+    filename = db.Column(db.String(255), nullable=False)
+    original_filename = db.Column(db.String(255), nullable=False)
+    document_type = db.Column(db.String(100))
+    uploaded_at = db.Column(db.DateTime, default=datetime.utcnow)
+    uploaded_by = db.Column(db.Integer, db.ForeignKey('users.id'))
 
 @login_manager.user_loader
 def load_user(user_id):
@@ -516,6 +533,71 @@ def send_smtp_email(recipient_email, subject, body, user_id):
         return True, "Sent"
     except Exception as e:
         return False, str(e)
+
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+@app.route('/contact/<int:contact_id>/documents', methods=['GET', 'POST'])
+@login_required
+def contact_documents(contact_id):
+    contact = Contact.query.get_or_404(contact_id)
+
+    if request.method == 'POST':
+        if 'file' not in request.files:
+            flash('No file selected.', 'error')
+            return redirect(url_for('contact_documents', contact_id=contact_id))
+
+        file = request.files['file']
+        doc_type = request.form.get('document_type', '').strip()
+
+        if file.filename == '':
+            flash('No file selected.', 'error')
+            return redirect(url_for('contact_documents', contact_id=contact_id))
+
+        if file and allowed_file(file.filename):
+            filename = secure_filename(f"{datetime.utcnow().timestamp()}_{file.filename}")
+            file.save(os.path.join(UPLOAD_FOLDER, filename))
+
+            doc = Document(
+                contact_id=contact_id,
+                filename=filename,
+                original_filename=file.filename,
+                document_type=doc_type,
+                uploaded_by=current_user.id
+            )
+            db.session.add(doc)
+            db.session.commit()
+            flash('Document uploaded!', 'success')
+        else:
+            flash('Invalid file type. Allowed: PDF, DOC, DOCX, XLS, XLSX, PNG, JPG', 'error')
+
+        return redirect(url_for('contact_documents', contact_id=contact_id))
+
+    documents = Document.query.filter_by(contact_id=contact_id).order_by(Document.uploaded_at.desc()).all()
+    return render_template('contact_documents.html', contact=contact, documents=documents)
+
+@app.route('/contact/<int:contact_id>/document/<int:doc_id>/delete', methods=['POST'])
+@login_required
+def delete_document(contact_id, doc_id):
+    doc = Document.query.get_or_404(doc_id)
+    if doc.contact_id != contact_id:
+        flash('Document not found.', 'error')
+        return redirect(url_for('contacts_list'))
+
+    try:
+        os.remove(os.path.join(UPLOAD_FOLDER, doc.filename))
+    except:
+        pass
+
+    db.session.delete(doc)
+    db.session.commit()
+    flash('Document deleted.', 'success')
+    return redirect(url_for('contact_documents', contact_id=contact_id))
+
+@app.route('/uploads/<filename>')
+@login_required
+def download_file(filename):
+    return send_from_directory(UPLOAD_FOLDER, filename, as_attachment=True)
 
 @app.route('/settings', methods=['GET', 'POST'])
 @login_required
