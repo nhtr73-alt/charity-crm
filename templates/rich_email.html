@@ -189,14 +189,22 @@
 
 <link rel="stylesheet" href="{{ url_for('static', filename='rich-editor.css') }}">
 <script src="{{ url_for('static', filename='rich-editor.js') }}"></script>
-<script>
-let richEditor;
-let allContacts = {{ all_contacts | tojson | safe }};
-let currentTemplateId = null;
-let attachments = [];
-let selectedAttachmentIds = [];
+<script type="text/javascript">
+// Debug
+console.log('Template loading');
 
-console.log('allContacts:', allContacts);
+var richEditor = null;
+var allContacts = [];
+var currentTemplateId = null;
+var attachments = [];
+var selectedAttachmentIds = [];
+
+try {
+    allContacts = {{ all_contacts | tojson | safe }};
+    console.log('allContacts loaded:', allContacts.length);
+} catch(e) {
+    console.error('Error loading contacts:', e);
+}
 
 document.addEventListener('DOMContentLoaded', function() {
     richEditor = new RichEmailBuilder('rich-editor', {
