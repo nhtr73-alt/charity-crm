@@ -1,4 +1,6 @@
 import os
+import time
+from html import unescape
 from flask import Flask, render_template, request, redirect, url_for, flash, session, make_response
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -547,7 +549,6 @@ def email_compose():
             return render_template('email_compose.html', contacts=contacts, templates=templates, templates_json=templates_json)
 
         if use_smtp:
-            import time
             success_count = 0
             error_count = 0
             for recipient in recipients:
@@ -557,7 +558,6 @@ def email_compose():
                 personalized_body = personalized_body.replace('{email}', recipient.email or '')
                 personalized_body = personalized_body.replace('{company}', recipient.company or '')
 
-                from html import unescape
                 personalized_body = unescape(personalized_body)
 
                 ok, msg = send_smtp_email(recipient.email, subject, personalized_body, current_user.id)
