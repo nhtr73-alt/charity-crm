@@ -1,0 +1,136 @@
+.email-builder-container {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.email-builder-toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 15px;
+    background: #f8f9fa;
+    border-radius: 8px;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.toolbar-section {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.email-builder-editor {
+    flex: 1;
+    min-height: 400px;
+    background: #fff;
+    border: 2px dashed #dee2e6;
+    border-radius: 8px;
+    padding: 20px;
+}
+
+.blocks-container {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.block-item {
+    background: #fff;
+    border: 2px solid #dee2e6;
+    border-radius: 8px;
+    overflow: hidden;
+    cursor: move;
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.block-item:hover {
+    border-color: #adb5bd;
+}
+
+.block-item.selected {
+    border-color: #2E7D32;
+    box-shadow: 0 0 0 3px rgba(46, 125, 50, 0.1);
+}
+
+.block-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 15px;
+    background: #f8f9fa;
+    border-bottom: 1px solid #dee2e6;
+}
+
+.block-type {
+    font-weight: 600;
+    font-size: 14px;
+    color: #495057;
+}
+
+.block-actions {
+    display: flex;
+    gap: 5px;
+}
+
+.block-content {
+    padding: 15px;
+}
+
+.email-builder-preview {
+    background: #f8f9fa;
+    border-radius: 8px;
+    padding: 20px;
+    min-height: 300px;
+}
+
+.preview-content {
+    background: #ffffff;
+    border-radius: 8px;
+    padding: 30px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    max-width: 600px;
+    margin: 0 auto;
+}
+
+.btn-xs {
+    padding: 2px 6px;
+    font-size: 11px;
+}
+
+/* Merge field buttons */
+.mt-2 .btn-xs {
+    margin-right: 4px;
+    margin-bottom: 4px;
+}
+
+/* Mobile responsiveness */
+@media (max-width: 768px) {
+    .email-builder-toolbar {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .toolbar-section {
+        justify-content: center;
+    }
+    
+    .toolbar-section .btn {
+        flex: 1;
+    }
+}
+
+/* Draggable styling */
+.block-item[draggable="true"] {
+    cursor: grab;
+}
+
+.block-item[draggable="true"]:active {
+    cursor: grabbing;
+}
+
+.block-item.dragging {
+    opacity: 0.5;
+}
