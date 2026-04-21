@@ -35,8 +35,11 @@
             <a href="{{ url_for('email_page') }}" class="{% if request.endpoint == 'email_page' %}active{% endif %}">
                 <i class="bi bi-envelope"></i> Email
             </a>
+            <a href="{{ url_for('rich_email') }}" class="{% if request.endpoint == 'rich_email' %}active{% endif %}">
+                <i class="bi bi-pencil-square"></i> Rich Email Editor
+            </a>
             <a href="{{ url_for('email_builder') }}" class="{% if request.endpoint == 'email_builder' %}active{% endif %}">
-                <i class="bi bi-layout-text-window"></i> Email Builder
+                <i class="bi bi-layout-text-window"></i> Block Builder
             </a>
             <a href="{{ url_for('settings') }}" class="{% if request.endpoint == 'settings' %}active{% endif %}">
                 <i class="bi bi-gear"></i> Settings
