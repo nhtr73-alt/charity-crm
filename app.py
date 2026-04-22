@@ -894,16 +894,6 @@ def email_builder():
 
 @app.route('/email/rich')
 @login_required
-def email_compose():
-    category_filter = request.args.get('category', '')
-    if category_filter:
-        all_contacts = Contact.query.filter_by(category=category_filter).all()
-    else:
-        all_contacts = Contact.query.all()
-    contacts_data = [{'id': c.id, 'first_name': c.first_name, 'last_name': c.last_name, 'email': c.email, 'company': c.company} for c in all_contacts]
-    return render_template('email_compose.html', all_contacts=contacts_data, category_filter=category_filter)
-
-
 def rich_email():
     category_filter = request.args.get('category', '')
     if category_filter:
