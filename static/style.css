@@ -20,6 +20,7 @@ body {
     position: fixed;
     height: 100vh;
     padding: 20px 0;
+    overflow-y: auto;
 }
 
 .sidebar .brand {
